@@ -123,3 +123,24 @@ set `DATABASE_SSL=true`, run `npm run db:migrate`, and start infra with `npm run
 | `npm run infra:up` | Start Keycloak (+ its DB) |
 | `npm run infra:up:local-db` | Also start the local Postgres stand-in |
 | `npm run infra:down` | Stop all containers (data volumes are kept) |
+
+## Troubleshooting
+
+**"Invalid authenticator code" although the code is right.** The one-time codes depend on the phone and
+the server agreeing on the time. Keycloak's container uses the PC's clock, and Keycloak accepts at most
+one 30-second window of drift. A PC clock that is a minute or more off (common after sleep) rejects every
+code. Fix: Windows **Settings → Time & language → Date & time → Sync now** (with *Set time
+automatically* on). If Keycloak still disagrees, restart Docker Desktop. To compare the clocks:
+
+```bash
+date -u +%T; docker exec trust-guard-keycloak-1 date -u +%T
+```
+
+**The setup page shows a new QR code.** Each new enrolment attempt creates a new secret. Delete the old
+"Trust Guard" entry in the authenticator app and scan the new code.
+
+**"Device name" on the authenticator setup page.** This is a free-text label for the phone (e.g. `My phone`).
+It is optional, and admins see it under the user's *Credentials* tab in Keycloak.
+
+**Codes fail after re-importing the realm.** Deleting and re-importing the `trust-guard` realm removes
+enrolled authenticators. Delete the old entry in the app and enrol again.
