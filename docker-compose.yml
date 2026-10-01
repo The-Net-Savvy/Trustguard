@@ -1,0 +1,101 @@
+# Trust Guard: local infrastructure
+#
+#   docker compose up -d                       -> Keycloak (+ its own Postgres)
+#   docker compose --profile local-db up -d    -> + local stand-in for Supabase Postgres
+#   docker compose --profile app up -d --build -> + Trust Guard app container
+#
+# All secrets come from `.env` (copy from .env.example). Nothing is hard-coded.
+name: trust-guard
+
+services:
+  # ---------------------------------------------------------------------------
+  # Identity provider: Keycloak, with its own dedicated database.
+  # ---------------------------------------------------------------------------
+  keycloak-db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Set KEYCLOAK_DB_PASSWORD in .env}
+    volumes:
+      - keycloak-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    # start-dev: HTTP on localhost for the prototype. --import-realm loads any
+    # realm JSON placed in ./keycloak/import (added in the authentication phase).
+    command: ["start-dev", "--import-realm"]
+    restart: unless-stopped
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD in .env}
+      KC_HOSTNAME: http://localhost:8080
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak/import:/opt/keycloak/data/import:ro
+    healthcheck:
+      # The Keycloak image has no curl, so use bash's /dev/tcp against the management port.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL local stand-in for Supabase PostgreSQL (offline development/demo).
+  # In the target setup DATABASE_URL points at the Supabase project instead.
+  # ---------------------------------------------------------------------------
+  app-db:
+    profiles: ["local-db"]
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: trustguard
+      POSTGRES_USER: trustguard
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}
+    ports:
+      - "55432:5432"
+    volumes:
+      - app-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trustguard -d trustguard"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL containerised Trust Guard app (production-style build).
+  # For day-to-day development run `npm run dev` on the host instead.
+  # ---------------------------------------------------------------------------
+  app:
+    profiles: ["app"]
+    build: .
+    env_file: .env
+    environment:
+      # Inside the container, "localhost" is the container itself. Override
+      # DATABASE_URL here if it points at the local-db container.
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+
+volumes:
+  keycloak-db-data:
+  app-db-data:
