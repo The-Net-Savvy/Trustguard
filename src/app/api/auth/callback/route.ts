@@ -55,7 +55,10 @@ export async function GET(request: NextRequest) {
     });
     if (!(err instanceof LoginError)) console.error("[auth] callback failed:", err);
 
-    const response = NextResponse.redirect(new URL(`/login?error=${code}`, appUrl), 303);
+    const failure = new URL("/login", appUrl);
+    failure.searchParams.set("error", code);
+    if (err instanceof LoginError && err.returnTo) failure.searchParams.set("returnTo", err.returnTo);
+    const response = NextResponse.redirect(failure, 303);
     response.cookies.delete({ name: LOGIN_TX_COOKIE, path: "/api/auth" });
     return response;
   }

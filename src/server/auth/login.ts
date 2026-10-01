@@ -38,6 +38,9 @@ export type LoginErrorCode =
   | "invalid_claims";
 
 export class LoginError extends Error {
+  /** Where the user was heading, once the login transaction could be read. */
+  returnTo?: string;
+
   constructor(
     readonly code: LoginErrorCode,
     message: string,
@@ -48,12 +51,25 @@ export class LoginError extends Error {
   }
 }
 
-/** Only allow same-origin relative paths as post-login destinations (no open redirects). */
+const DEFAULT_RETURN_TO = "/dashboard";
+
+/**
+ * Only allow same-origin paths as post-login destinations (no open redirects).
+ *
+ * The value is resolved the way the redirect will be, so tricks such as `//host`,
+ * `/\host` or `/<TAB>/host` (the URL parser strips tabs and newlines) are caught by
+ * the origin check rather than by string matching.
+ */
 export function safeReturnTo(value: string | null | undefined): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) {
-    return "/dashboard";
+  if (!value || !value.startsWith("/")) return DEFAULT_RETURN_TO;
+  try {
+    const appOrigin = new URL(getEnv().APP_URL).origin;
+    const resolved = new URL(value, appOrigin);
+    if (resolved.origin !== appOrigin) return DEFAULT_RETURN_TO;
+    return resolved.pathname + resolved.search + resolved.hash;
+  } catch {
+    return DEFAULT_RETURN_TO;
   }
-  return value;
 }
 
 export function loginTransactionCookieOptions() {
@@ -145,7 +161,20 @@ export async function completeLogin(
   context: RequestContext,
 ): Promise<CompletedLogin> {
   const tx = readTransaction(transactionCookie);
+  try {
+    return await finishLogin(callbackUrl, tx, context);
+  } catch (err) {
+    // Keep the destination so the user can retry without losing their place.
+    if (err instanceof LoginError) err.returnTo = tx.returnTo;
+    throw err;
+  }
+}
 
+async function finishLogin(
+  callbackUrl: URL,
+  tx: LoginTransaction,
+  context: RequestContext,
+): Promise<CompletedLogin> {
   // Errors reported by Keycloak itself (e.g. user cancelled, account disabled).
   const idpError = callbackUrl.searchParams.get("error");
   if (idpError) {

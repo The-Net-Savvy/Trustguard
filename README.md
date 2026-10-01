@@ -60,7 +60,7 @@ At first sign-in each must scan a QR code with an authenticator app (Google Auth
 
 `npm run test:e2e:auth` (stack and `npm run dev` running) creates a temporary Keycloak user and drives the real login pages
 over HTTP. It covers TOTP enrolment, MFA enforcement, logout, re-login, token refresh, back-channel logout, idle timeout
-and negative cases, then deletes the user. Expected: `26 passed, 0 failed`.
+open-redirect attempts and other negative cases, then deletes the user. Expected: `33 passed, 0 failed`.
 
 ## Folder structure
 

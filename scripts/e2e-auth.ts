@@ -155,9 +155,11 @@ async function login(
   username: string,
   password: string,
   otp: { enrol: true } | { secret: Buffer },
-  reauth = false,
+  { reauth = false, returnTo = "/dashboard" }: { reauth?: boolean; returnTo?: string } = {},
 ): Promise<{ finalUrl: URL; totpSecret?: Buffer }> {
-  const start = await b.request(`${APP}/api/auth/login?returnTo=/dashboard${reauth ? "&reauth=1" : ""}`);
+  const start = await b.request(
+    `${APP}/api/auth/login?returnTo=${encodeURIComponent(returnTo)}${reauth ? "&reauth=1" : ""}`,
+  );
   const loginPage = await b.follow(start.headers.get("location")!);
   const html = await loginPage.res.text();
 
@@ -251,16 +253,32 @@ async function main() {
 
     console.log("\n2. First login: mandatory TOTP enrolment, then re-authentication with a code");
     const browser = new Browser();
-    const enrol = await login(browser, username, password, { enrol: true });
+    const destination = "/dashboard?from=e2e";
+    const enrol = await login(browser, username, password, { enrol: true }, { returnTo: destination });
     check(
       "enrolment-only login is not trusted (amr lacks otp)",
       enrol.finalUrl.pathname === "/login" && enrol.finalUrl.searchParams.get("error") === "mfa_required",
       enrol.finalUrl.href,
     );
+    check(
+      "failed login keeps the destination",
+      enrol.finalUrl.searchParams.get("returnTo") === destination,
+      enrol.finalUrl.searchParams.get("returnTo") ?? "missing",
+    );
     check("no session after enrolment-only login", !browser.get("tg_session"));
     await nextTotpWindow();
-    const first = await login(browser, username, password, { secret: enrol.totpSecret! }, true);
-    check("re-authentication with a code lands on /dashboard", first.finalUrl.pathname === "/dashboard", first.finalUrl.href);
+    const first = await login(
+      browser,
+      username,
+      password,
+      { secret: enrol.totpSecret! },
+      { reauth: true, returnTo: enrol.finalUrl.searchParams.get("returnTo")! },
+    );
+    check(
+      "re-authentication returns to the original destination",
+      first.finalUrl.origin === APP && first.finalUrl.pathname + first.finalUrl.search === destination,
+      first.finalUrl.href,
+    );
     const cookie = browser.get("tg_session");
     check("session cookie issued", !!cookie);
     check("login-transaction cookie cleared", !browser.get("tg_login_tx"));
@@ -298,8 +316,19 @@ async function main() {
 
     console.log("\n4. Second login with one-time code");
     await nextTotpWindow();
-    const second = await login(browser, username, password, { secret: enrol.totpSecret! });
-    check("second login succeeds", second.finalUrl.pathname === "/dashboard", second.finalUrl.href);
+    // Full login with a hostile destination: must still end on the app's own dashboard.
+    const second = await login(
+      browser,
+      username,
+      password,
+      { secret: enrol.totpSecret! },
+      { returnTo: "/\t/evil.example/phish" },
+    );
+    check(
+      "second login succeeds and ignores hostile returnTo",
+      second.finalUrl.origin === APP && second.finalUrl.pathname === "/dashboard",
+      second.finalUrl.href,
+    );
 
     console.log("\n   Continuous verification: expired access token is refreshed with Keycloak");
     const latest = `(select s.id from trustguard.sessions s join trustguard.users u on u.id = s.user_id
@@ -357,8 +386,26 @@ async function main() {
     const tamper = new Browser();
     const t1 = await tamper.request(`${APP}/api/auth/callback?code=abc&state=xyz`);
     check("callback without login transaction rejected", (t1.headers.get("location") ?? "").includes("error=transaction_missing"));
-    const evilReturn = await tamper.request(`${APP}/api/auth/login?returnTo=//evil.example`);
-    check("login start still works with hostile returnTo", evilReturn.status === 303);
+    // Open-redirect attempts: the sign-in link must always point back to /dashboard.
+    for (const hostile of [
+      "//evil.example",
+      "/\\evil.example",
+      "/\t/evil.example",
+      "/\n/evil.example",
+      "https://evil.example",
+      "javascript:alert(1)",
+      "/%2F%2Fevil.example",
+    ]) {
+      const page = await (await tamper.request(`${APP}/login?returnTo=${encodeURIComponent(hostile)}`)).text();
+      const href = decodeHtml(page.match(/href="(\/api\/auth\/login\?[^"]+)"/)?.[1] ?? "");
+      const target = new URL(href || "/", APP).searchParams.get("returnTo") ?? "";
+      const lands = new URL(target, APP);
+      check(
+        `hostile returnTo ${JSON.stringify(hostile)} stays on the app`,
+        lands.origin === APP && !lands.pathname.startsWith("//"),
+        target,
+      );
+    }
     const bc = await fetch(`${APP}/api/auth/backchannel-logout`, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
