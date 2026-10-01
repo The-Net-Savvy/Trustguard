@@ -16,6 +16,9 @@ const ERROR_MESSAGES: Record<string, string> = {
   mfa_required:
     "A one-time code is required. If you have just set up your authenticator app, sign in once more and enter a code from it to finish.",
   invalid_claims: "The identity provider returned an invalid identity.",
+  device_mismatch:
+    "Your session was ended because it was used from a different device or browser. Sign in again on this device.",
+  session_ended: "Your session has ended. Please sign in again.",
   internal_error: "Something went wrong while signing you in.",
 };
 
@@ -25,12 +28,14 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const returnTo = safeReturnTo(one(params.returnTo));
   const error = one(params.error);
   const signedOut = one(params.signed_out) === "1";
+  // The policy engine asks for step-up (re-authentication) on risky or sensitive access.
+  const stepUp = one(params.reason) === "step_up";
 
-  if (await getCurrentSession()) redirect(returnTo);
+  if (!stepUp && (await getCurrentSession())) redirect(returnTo);
 
   const configured = isKeycloakConfigured();
-  // After TOTP enrolment (or any login without a second factor) force a full re-authentication.
-  const reauth = error === "mfa_required" ? "&reauth=1" : "";
+  // After TOTP enrolment, a login without a second factor, or a step-up request: force a full re-authentication.
+  const reauth = error === "mfa_required" || stepUp ? "&reauth=1" : "";
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-12">
@@ -41,6 +46,12 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         one-time code from your authenticator app.
       </p>
 
+      {stepUp && !error && (
+        <p className="mt-6 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+          Additional verification is required for this page. Please confirm it is you with your password and
+          a new one-time code.
+        </p>
+      )}
       {signedOut && !error && (
         <p className="mt-6 rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
           You have been signed out.

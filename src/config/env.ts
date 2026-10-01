@@ -36,6 +36,21 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("true")
     .transform((v) => v === "true"),
+
+  // Device posture: how old a posture report may be before it is re-collected.
+  POSTURE_MAX_AGE_MINUTES: z.coerce.number().int().positive().default(10),
+  // Risk context: business hours (OFF_HOURS signal) and trusted networks (OFF_NETWORK signal).
+  BUSINESS_TIMEZONE: z.string().default("Africa/Lagos"),
+  BUSINESS_HOURS: z
+    .string()
+    .regex(/^\d{2}:\d{2}-\d{2}:\d{2}$/, "expected HH:MM-HH:MM")
+    .default("07:00-19:00"),
+  BUSINESS_DAYS: z.string().default("1-5"),
+  // Comma-separated CIDRs, e.g. "102.89.0.0/16,10.0.0.0/8". Empty: signal disabled.
+  TRUSTED_NETWORKS: z
+    .string()
+    .default("")
+    .transform((v) => v.split(",").map((s) => s.trim()).filter(Boolean)),
 });
 
 export type ServerEnv = z.infer<typeof envSchema>;

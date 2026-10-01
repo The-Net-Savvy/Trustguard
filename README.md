@@ -2,8 +2,9 @@
 
 **A Zero-Trust-Inspired Authentication Framework for Securing Remote Access in Nigerian Small and Medium Enterprises (SMEs)**: Master's research prototype.
 
-> Status: **Phase 2, Authentication.** OIDC login with mandatory TOTP, server-side sessions, logout,
-> back-channel logout and audit logging are implemented. Device posture, risk and policy engines follow.
+> Status: **Phase 3, Device posture, risk and least privilege.** On top of authentication (OIDC + mandatory
+> TOTP, server-side sessions, back-channel logout, audit log), every protected request is now evaluated against
+> device posture, a risk score and a least-privilege policy. Administrative controls follow.
 
 ## Architecture
 
@@ -56,11 +57,56 @@ The realm import (`keycloak/import/trust-guard-realm.json`) creates:
 
 At first sign-in each must scan a QR code with an authenticator app (Google Authenticator, Microsoft Authenticator, Aegis…).
 
-### End-to-end test
+## Device posture, risk and policy (phase 3)
 
-`npm run test:e2e:auth` (stack and `npm run dev` running) creates a temporary Keycloak user and drives the real login pages
-over HTTP. It covers TOTP enrolment, MFA enforcement, logout, re-login, token refresh, back-channel logout, idle timeout
-open-redirect attempts and other negative cases, then deletes the user. Expected: `33 passed, 0 failed`.
+Every protected page calls `requireAccess(resource)` ([require-access.ts](src/server/access/require-access.ts)).
+Each request is evaluated in six steps:
+
+1. **Session** is valid (status, timeouts, IdP re-verification), as in phase 2.
+2. **Device binding.** At sign-in the browser gets a random `tg_device` cookie (stored hashed). The first posture
+   report binds the session to that device, atomically. A session cookie presented from any other device is
+   treated as stolen: the session is revoked and the event is audited.
+3. **Device posture.** After sign-in, `/verify-device` collects what a browser can observe: browser and version
+   (UA Client Hints), OS and version, secure context, automation (`navigator.webdriver`) and User-Agent consistency.
+   A heartbeat re-reports every 4 minutes and whenever the tab becomes visible again. A report older than
+   `POSTURE_MAX_AGE_MINUTES` is collected again before access continues.
+4. **Risk score** (0–100, additive; [assess.ts](src/server/risk-engine/assess.ts)):
+
+   | Signal | Weight | | Signal | Weight |
+   |---|---|---|---|---|
+   | Automation detected | 70 | | New device (first session) | 20 |
+   | No secure context | 40 | | Repeated failed sign-ins (≥3/h) | 20 |
+   | Posture contradicts request (UA) | 40 | | Unsupported OS (e.g. Windows 10) or browser | 15 |
+   | Outdated browser | 20 | | IP changed since sign-in | 15 |
+   | | | | Off company network / outside business hours | 10 each |
+
+   Low is below 30, medium is 30–59, high is 60 and above.
+5. **Policy decision** ([policies.ts](src/server/policy-engine/policies.ts), deny by default):
+
+   | Resource | Roles | Allow up to | Step-up | Always deny |
+   |---|---|---|---|---|
+   | `dashboard` | `tg-employee` | medium | none (high: deny) | automation, UA mismatch |
+   | `admin.console` | `tg-admin` | low | medium, unless signed in < 10 min ago; also any sign-in > 60 min old | automation, UA mismatch, insecure context |
+
+   **Step-up** sends the user to sign in again (password + new code, `prompt=login`). The new session satisfies the policy.
+6. **Audit.** Every step-up and deny is recorded, and an allow is recorded whenever the risk level changes.
+   Posture results are audited when they change. `/admin` shows the log.
+
+**Limits of browser-based posture.** A web page cannot see disk encryption, antivirus, screen lock or patch
+level. These need an installed agent or MDM, which is out of scope for this prototype. IP-based signals
+(`NETWORK_CHANGED`, `OFF_NETWORK`) are only trustworthy behind a reverse proxy that overwrites
+`X-Forwarded-For`. Next.js otherwise passes a client-supplied value through unchanged. Device binding does not
+depend on IP.
+
+### Tests
+
+| Command | What it covers | Expected |
+|---|---|---|
+| `npm test` | Unit tests for posture evaluation, risk scoring and policy decisions (pure functions) | 31 passing |
+| `npm run test:e2e:auth` | Phase 2: login, MFA, logout, refresh, back-channel logout, timeouts, open redirects | 33 passed |
+| `npm run test:e2e:access` | Phase 3: device verification, least privilege, posture changes, high risk, stale posture, stolen cookie, concurrent reports, admin step-up | 30 passed |
+
+The e2e tests need the stack and `npm run dev` running. They create temporary Keycloak users and delete them afterwards.
 
 ## Folder structure
 
@@ -69,25 +115,30 @@ src/
 ├── app/                      # UI routes + API route handlers (Next.js App Router)
 │   ├── page.tsx              #   Landing / system status page
 │   ├── login/, dashboard/    #   Sign-in page, protected dashboard
+│   ├── verify-device/        #   Device posture collection after sign-in
+│   ├── admin/, access-denied/ #  Admin console (audit view), explained denials
 │   └── api/
 │       ├── health/           #   GET /api/health: DB + Keycloak health (JSON)
-│       └── auth/             #   login, callback, logout, backchannel-logout
-├── proxy.ts                  # Optimistic route guard (cookie presence only)
+│       ├── auth/             #   login, callback, logout, backchannel-logout
+│       └── device/posture/   #   POST: browser posture reports (binding + heartbeat)
+├── proxy.ts                  # Optimistic route guard (cookie presence) + forwards request path
 ├── components/               # UI components (client-safe, no secrets)
 ├── config/env.ts             # Validated server-side environment (zod, server-only)
 └── server/                   # BFF / server-only logic
     ├── auth/                 #   Keycloak OIDC client, login flow, back-channel token validation
     ├── session/              #   Encrypted server-side sessions, requireSession(), timeouts, refresh
-    ├── device-posture/       #   Device posture validation
-    ├── risk-engine/          #   Risk scoring
-    ├── policy-engine/        #   Access control / least-privilege decisions
+    ├── access/               #   requireAccess(): the policy enforcement point
+    ├── device-posture/       #   Posture evaluation (pure) + device registry
+    ├── risk-engine/          #   Risk scoring and context helpers (pure)
+    ├── policy-engine/        #   Policies as code + decision point (pure)
     ├── audit/                #   Audit logging
     ├── admin/                #   Administrative controls
     ├── db/                   #   PostgreSQL pool + query helper
     └── health/               #   Infrastructure health checks
 db/migrations/                # Numbered SQL migrations (applied by scripts/db-migrate.ts)
 keycloak/import/              # Realm JSON auto-imported by Keycloak on start
-scripts/                      # Dev tooling (migration runner)
+scripts/                      # Migration runner, end-to-end tests (scripts/lib/e2e.ts helpers)
+tests/                        # Unit tests (node:test via tsx)
 docker-compose.yml, Dockerfile
 ```
 
@@ -119,7 +170,9 @@ set `DATABASE_SSL=true`, run `npm run db:migrate`, and start infra with `npm run
 | `npm run build` / `start` | Production build / serve |
 | `npm run typecheck` / `lint` | Static checks |
 | `npm run db:migrate` | Apply pending SQL migrations |
+| `npm test` | Unit tests (posture, risk, policy) |
 | `npm run test:e2e:auth` | End-to-end authentication test against the running stack |
+| `npm run test:e2e:access` | End-to-end device/risk/policy test against the running stack |
 | `npm run infra:up` | Start Keycloak (+ its DB) |
 | `npm run infra:up:local-db` | Also start the local Postgres stand-in |
 | `npm run infra:down` | Stop all containers (data volumes are kept) |

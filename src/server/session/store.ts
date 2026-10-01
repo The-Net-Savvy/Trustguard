@@ -3,6 +3,7 @@ import { getEnv } from "@/config/env";
 import { query } from "@/server/db/client";
 import type { RequestContext } from "@/server/request-context";
 import { decrypt, encrypt, hashSessionId, newSessionId } from "./crypto";
+import type { DevicePostureReport } from "@/server/device-posture/types";
 import type { AppSession, AuthenticatedSession, SessionUser, StoredTokens } from "./types";
 
 /** Data access for `trustguard.users` and `trustguard.sessions`. */
@@ -27,6 +28,11 @@ interface SessionRow extends UserRow {
   last_verified_at: Date;
   absolute_expires_at: Date;
   tokens_encrypted: string;
+  ip_address: string | null;
+  device_id: string | null;
+  posture: AppSession["posture"];
+  posture_at: Date | null;
+  last_access: Record<string, string>;
 }
 
 function toSession(r: SessionRow): AppSession {
@@ -41,6 +47,11 @@ function toSession(r: SessionRow): AppSession {
     lastSeenAt: r.last_seen_at,
     lastVerifiedAt: r.last_verified_at,
     absoluteExpiresAt: r.absolute_expires_at,
+    ipAddress: r.ip_address,
+    deviceId: r.device_id,
+    posture: r.posture,
+    postureAt: r.posture_at,
+    lastAccess: r.last_access,
   };
 }
 
@@ -124,7 +135,8 @@ export async function findSessionByCookie(cookieValue: string): Promise<LoadedSe
   const { rows } = await query<SessionRow>(
     `select s.id, s.user_id, s.status, s.idp_session_id, s.auth_methods, s.access_expires_at,
             s.created_at, s.last_seen_at, s.last_verified_at, s.absolute_expires_at,
-            s.tokens_encrypted, u.keycloak_sub, u.username, u.email, u.display_name, u.roles
+            s.tokens_encrypted, host(s.ip_address) as ip_address, s.device_id, s.posture,
+            s.posture_at, s.last_access, u.keycloak_sub, u.username, u.email, u.display_name, u.roles
        from trustguard.sessions s
        join trustguard.users u on u.id = s.user_id
       where s.id_hash = $1`,
@@ -212,4 +224,33 @@ export async function revokeByKeycloakSub(
     [sub, reason],
   );
   return rows;
+}
+
+/**
+ * Bind the session to its device (first report wins, atomically) and store the
+ * latest posture. Returns false, without saving, if the session is bound to a
+ * different device.
+ */
+export async function savePosture(
+  sessionId: string,
+  deviceId: string,
+  posture: DevicePostureReport,
+): Promise<boolean> {
+  const { rowCount } = await query(
+    `update trustguard.sessions
+        set device_id = coalesce(device_id, $2), posture = $3, posture_at = now()
+      where id = $1 and status = 'active' and (device_id is null or device_id = $2)`,
+    [sessionId, deviceId, JSON.stringify(posture)],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+/** Remember the latest decision for a resource (drives audit de-duplication). */
+export async function recordAccess(sessionId: string, resource: string, key: string): Promise<void> {
+  await query(
+    `update trustguard.sessions
+        set last_access = last_access || jsonb_build_object($2::text, $3::text)
+      where id = $1`,
+    [sessionId, resource, key],
+  );
 }

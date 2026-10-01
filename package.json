@@ -8,11 +8,13 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
     "db:migrate": "tsx scripts/db-migrate.ts",
     "infra:up": "docker compose up -d",
     "infra:up:local-db": "docker compose --profile local-db up -d",
     "infra:down": "docker compose --profile local-db --profile app down",
-    "test:e2e:auth": "tsx scripts/e2e-auth.ts"
+    "test:e2e:auth": "tsx scripts/e2e-auth.ts",
+    "test:e2e:access": "tsx scripts/e2e-access.ts"
   },
   "dependencies": {
     "jose": "^6.2.12",

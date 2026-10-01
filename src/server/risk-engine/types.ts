@@ -1,31 +1,51 @@
 /**
- * Risk engine: contracts only (implemented in a later phase).
+ * Risk engine contracts.
  *
- * Combines contextual signals into a risk score that the policy engine
- * uses to allow, step-up (require MFA again) or deny access.
+ * Contextual signals are combined into a 0-100 risk score that the policy engine
+ * uses to allow, step-up (re-authenticate) or deny access.
  */
 
 import type { PostureAssessment } from "@/server/device-posture/types";
 
 export type RiskLevel = "low" | "medium" | "high";
 
-export interface RiskContext {
-  userId: string;
-  ipAddress: string;
+export type RiskSignalCode =
+  | "AUTOMATION_DETECTED"
+  | "INSECURE_CONTEXT"
+  | "UA_MISMATCH"
+  | "BROWSER_OUTDATED"
+  | "BROWSER_UNSUPPORTED"
+  | "OS_UNSUPPORTED"
+  | "NEW_DEVICE"
+  | "NETWORK_CHANGED"
+  | "OFF_NETWORK"
+  | "OFF_HOURS"
+  | "RECENT_FAILED_LOGINS";
+
+export interface RiskInput {
   posture: PostureAssessment;
-  /** Local time of the request, used for off-hours signals. */
-  requestTime: Date;
+  device: { isNew: boolean; trusted: boolean };
+  network: { ipChanged: boolean; onTrustedNetwork: boolean | null };
+  time: { offHours: boolean };
   recentFailedLogins: number;
 }
 
 export interface RiskSignal {
-  code: string; // e.g. "UNKNOWN_DEVICE", "NEW_IP", "OFF_HOURS"
+  code: RiskSignalCode;
   weight: number;
   description: string;
 }
 
 export interface RiskAssessment {
-  score: number; // 0 to 100
+  score: number;
   level: RiskLevel;
   signals: RiskSignal[];
+}
+
+export interface RiskConfig {
+  weights: Record<RiskSignalCode, number>;
+  /** Score at or above which the level is medium / high. */
+  thresholds: { medium: number; high: number };
+  /** Failed logins within the last hour at or above which RECENT_FAILED_LOGINS fires. */
+  failedLoginThreshold: number;
 }

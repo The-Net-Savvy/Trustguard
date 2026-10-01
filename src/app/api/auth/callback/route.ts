@@ -3,6 +3,7 @@ import { getEnv } from "@/config/env";
 import { recordAuditEvent } from "@/server/audit/log";
 import { redirectUris } from "@/server/auth/keycloak";
 import { completeLogin, LOGIN_TX_COOKIE, LoginError } from "@/server/auth/login";
+import { DEVICE_COOKIE, deviceCookieOptions, newDeviceCookie } from "@/server/device-posture/store";
 import { requestContext } from "@/server/request-context";
 import { SESSION_COOKIE, sessionCookieOptions } from "@/server/session/cookie";
 import { endSession, findSessionByCookie } from "@/server/session/store";
@@ -39,6 +40,11 @@ export async function GET(request: NextRequest) {
 
     const response = NextResponse.redirect(new URL(login.returnTo, appUrl), 303);
     response.cookies.set(SESSION_COOKIE, login.cookieValue, sessionCookieOptions());
+    // Issue the device identifier now, so every posture report after sign-in carries
+    // the same one (concurrent first reports must not register two devices).
+    if (!request.cookies.get(DEVICE_COOKIE)) {
+      response.cookies.set(DEVICE_COOKIE, newDeviceCookie(), deviceCookieOptions());
+    }
     response.cookies.delete({ name: LOGIN_TX_COOKIE, path: "/api/auth" });
     return response;
   } catch (err) {

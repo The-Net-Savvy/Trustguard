@@ -8,6 +8,8 @@
  * refreshed, and can be revoked (logout, back-channel logout, administrator).
  */
 
+import type { DevicePostureReport } from "@/server/device-posture/types";
+
 export type SessionStatus = "active" | "revoked" | "expired";
 
 export interface SessionUser {
@@ -30,6 +32,14 @@ export interface AppSession {
   lastSeenAt: Date;
   lastVerifiedAt: Date;
   absoluteExpiresAt: Date;
+  /** IP address the session was created from. */
+  ipAddress: string | null;
+  /** Device the session is bound to (set on the first posture report). */
+  deviceId: string | null;
+  posture: DevicePostureReport | null;
+  postureAt: Date | null;
+  /** Last recorded decision per resource, e.g. { dashboard: "allow:low" }. */
+  lastAccess: Record<string, string>;
 }
 
 /** Keycloak tokens, stored encrypted in the session row. Never sent to the browser. */

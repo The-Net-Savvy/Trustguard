@@ -1,6 +1,9 @@
+import Link from "next/link";
+import { RiskPanel } from "@/components/access/RiskPanel";
 import { LogoutButton } from "@/components/auth/LogoutButton";
+import { PostureHeartbeat } from "@/components/device/PostureHeartbeat";
+import { requireAccess } from "@/server/access/require-access";
 import { hasSecondFactor } from "@/server/auth/login";
-import { requireSession } from "@/server/session/current";
 
 export const metadata = { title: "Dashboard · Trust Guard" };
 
@@ -9,12 +12,19 @@ const ROLE_LABELS: Record<string, string> = {
   "tg-employee": "Employee",
 };
 
+const DEVICE_STATUS: Record<string, string> = {
+  registered: "Registered (not yet approved)",
+  trusted: "Trusted by an administrator",
+  blocked: "Blocked",
+};
+
 function formatTime(d: Date) {
   return d.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
 }
 
 export default async function DashboardPage() {
-  const { user, session } = await requireSession("/dashboard");
+  const { user, session, device, posture, risk, decision } = await requireAccess("dashboard", "/dashboard");
+  const isAdmin = user.roles.includes("tg-admin");
 
   const facts: [string, string][] = [
     ["Username", user.username],
@@ -25,9 +35,16 @@ export default async function DashboardPage() {
     ["Last verified with IdP", formatTime(session.lastVerifiedAt)],
     ["Session ends at the latest", formatTime(session.absoluteExpiresAt)],
   ];
+  const deviceFacts: [string, string][] = [
+    ["Device", posture.label],
+    ["Status", DEVICE_STATUS[device.status]],
+    ["First seen", formatTime(device.firstSeenAt)],
+    ["Posture checked", session.postureAt ? formatTime(session.postureAt) : "—"],
+  ];
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6">
+      <PostureHeartbeat />
       <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Trust Guard</p>
@@ -35,19 +52,35 @@ export default async function DashboardPage() {
             Welcome, {user.displayName ?? user.username}
           </h1>
         </div>
-        <LogoutButton />
+        <div className="flex gap-2">
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+            >
+              Admin console
+            </Link>
+          )}
+          <LogoutButton />
+        </div>
       </header>
 
       <section className="mb-8">
+        <h2 className="mb-1 text-lg font-semibold">Access decision</h2>
+        <p className="mb-3 text-sm text-slate-500">
+          Evaluated on this request · policy <code>{decision.policyId}</code> · {decision.explanation}
+        </p>
+        <RiskPanel risk={risk} posture={posture} />
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-3 text-lg font-semibold">This device</h2>
+        <FactList facts={deviceFacts} />
+      </section>
+
+      <section>
         <h2 className="mb-3 text-lg font-semibold">Your session</h2>
-        <dl className="divide-y divide-slate-200 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
-          {facts.map(([label, value]) => (
-            <div key={label} className="flex flex-col gap-1 p-4 sm:flex-row sm:justify-between">
-              <dt className="text-sm text-slate-500">{label}</dt>
-              <dd className="text-sm font-medium break-all sm:text-right">{value}</dd>
-            </div>
-          ))}
-        </dl>
+        <FactList facts={facts} />
         <p className="mt-2 text-xs text-slate-500">
           {hasSecondFactor(session.authMethods)
             ? "Multi-factor authentication verified at sign-in."
@@ -55,5 +88,18 @@ export default async function DashboardPage() {
         </p>
       </section>
     </main>
+  );
+}
+
+function FactList({ facts }: { facts: [string, string][] }) {
+  return (
+    <dl className="divide-y divide-slate-200 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+      {facts.map(([label, value]) => (
+        <div key={label} className="flex flex-col gap-1 p-4 sm:flex-row sm:justify-between">
+          <dt className="text-sm text-slate-500">{label}</dt>
+          <dd className="text-sm font-medium break-all sm:text-right">{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
