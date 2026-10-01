@@ -144,18 +144,23 @@ docker-compose.yml, Dockerfile
 
 ## Getting started
 
-Prerequisites: Node.js 20+ and Docker Desktop.
+Prerequisites: **Git**, **Node.js 20+** and **Docker Desktop** (running), with ports 3000, 8080 and 55432 free.
 
 ```bash
-cp .env.example .env              # then fill in the secrets (see comments in the file)
+git clone <repository-url> trust-guard
+cd trust-guard
 npm install
-npm run infra:up:local-db         # Keycloak + local Postgres stand-in
-npm run db:migrate                # creates the trustguard schema
+npm run setup                     # creates .env with fresh random secrets (never committed)
+npm run infra:up:local-db         # Keycloak + databases; Keycloak needs about a minute to start
+npm run db:migrate                # creates the trustguard schema and tables
 npm run dev                       # http://localhost:3000
 ```
 
-- App: http://localhost:3000 (status page), http://localhost:3000/api/health
-- Keycloak admin console: http://localhost:8080 (credentials from `.env`)
+- App: http://localhost:3000 (status page; all three components should show *Healthy*)
+- Sign in as `tg.admin` or `tg.employee`. Passwords are `SEED_ADMIN_PASSWORD` / `SEED_EMPLOYEE_PASSWORD` in `.env`.
+  Have an authenticator app ready (Google Authenticator, Microsoft Authenticator…); see *Authentication* above.
+- Keycloak admin console: http://localhost:8080 (`KEYCLOAK_ADMIN_USER` / `KEYCLOAK_ADMIN_PASSWORD` in `.env`)
+- Optional checks: `npm test`, then with the app running `npm run test:e2e:auth` and `npm run test:e2e:access`.
 
 ### Using a real Supabase project instead of the local stand-in
 
