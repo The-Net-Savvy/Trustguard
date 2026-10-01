@@ -28,6 +28,14 @@ const envSchema = z.object({
   KEYCLOAK_CLIENT_SECRET: optionalString,
 
   SESSION_SECRET: z.preprocess(emptyToUndefined, z.string().min(32).optional()),
+  // Session lifetime: sliding idle timeout and hard absolute limit.
+  SESSION_IDLE_TIMEOUT_MINUTES: z.coerce.number().int().positive().default(30),
+  SESSION_ABSOLUTE_TIMEOUT_HOURS: z.coerce.number().int().positive().default(8),
+  // Require the IdP to report a second factor (amr contains "otp"/"mfa") at login.
+  AUTH_REQUIRE_MFA: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
 });
 
 export type ServerEnv = z.infer<typeof envSchema>;

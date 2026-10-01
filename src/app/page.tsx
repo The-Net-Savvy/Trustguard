@@ -1,18 +1,19 @@
+import Link from "next/link";
 import { StatusBadge } from "@/components/status/StatusBadge";
 import { getSystemHealth } from "@/server/health/checks";
 
 export const dynamic = "force-dynamic";
 
-const PILLARS = [
-  "Identity-centric access control",
-  "Multi-factor authentication",
-  "Device posture validation",
-  "Continuous verification",
-  "Least privilege",
-  "Risk-aware access decisions",
-  "Session management",
-  "Administrative controls",
-  "Audit logging",
+const PILLARS: [string, "Implemented" | "Planned"][] = [
+  ["Identity-centric access control", "Implemented"],
+  ["Multi-factor authentication", "Implemented"],
+  ["Device posture validation", "Planned"],
+  ["Continuous verification", "Planned"],
+  ["Least privilege", "Planned"],
+  ["Risk-aware access decisions", "Planned"],
+  ["Session management", "Implemented"],
+  ["Administrative controls", "Planned"],
+  ["Audit logging", "Implemented"],
 ];
 
 export default async function Home() {
@@ -34,6 +35,12 @@ export default async function Home() {
           A research prototype for securing remote access in Nigerian small and medium
           enterprises. Never trust, always verify.
         </p>
+        <Link
+          href="/dashboard"
+          className="mt-6 inline-flex rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
+        >
+          Sign in
+        </Link>
       </header>
 
       <section className="mb-10">
@@ -61,13 +68,17 @@ export default async function Home() {
       <section>
         <h2 className="mb-3 text-lg font-semibold">Framework capabilities</h2>
         <ul className="grid gap-2 sm:grid-cols-2">
-          {PILLARS.map((p) => (
+          {PILLARS.map(([p, state]) => (
             <li
               key={p}
               className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-sm dark:border-slate-800"
             >
               {p}
-              <span className="text-xs text-slate-400">Planned</span>
+              <span
+                className={`text-xs ${state === "Implemented" ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}
+              >
+                {state}
+              </span>
             </li>
           ))}
         </ul>

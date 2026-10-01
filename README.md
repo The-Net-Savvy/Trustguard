@@ -2,7 +2,8 @@
 
 **A Zero-Trust-Inspired Authentication Framework for Securing Remote Access in Nigerian Small and Medium Enterprises (SMEs)**: Master's research prototype.
 
-> Status: **Phase 1, Project foundation.** Authentication is not implemented yet.
+> Status: **Phase 2, Authentication.** OIDC login with mandatory TOTP, server-side sessions, logout,
+> back-channel logout and audit logging are implemented. Device posture, risk and policy engines follow.
 
 ## Architecture
 
@@ -26,18 +27,57 @@ Design rules:
 - All app tables live in the `trustguard` schema, which is outside Supabase's auto-exposed `public` API.
 - All secrets come from environment variables. Only `.env.example` is committed.
 
+## Authentication
+
+| Step | What happens |
+|---|---|
+| 1. `GET /api/auth/login` | BFF creates state, nonce and a PKCE (S256) verifier, keeps them in a 10-minute encrypted HttpOnly cookie and redirects to Keycloak |
+| 2. Keycloak | Realm flow `trust-guard browser`: password **and** TOTP are both REQUIRED. Brute-force lockout after 5 failures. First login forces authenticator enrolment |
+| 3. `GET /api/auth/callback` | Validates state, nonce, PKCE and the ID token, then requires `amr` to contain a second factor (`AUTH_REQUIRE_MFA`). Provisions the user (`trustguard.users`) and creates a session |
+| 4. Session | The browser gets only an opaque `tg_session` cookie (HttpOnly, SameSite=Lax). The DB stores its SHA-256 hash and the Keycloak tokens, encrypted with AES-256-GCM |
+| 5. Every request | `requireSession()` checks status, idle timeout (30 min), absolute lifetime (8 h), and refreshes the access token with Keycloak when it expires, which re-verifies the IdP session. A Keycloak refusal revokes the app session |
+| 6. Logout | `POST /api/auth/logout` (same-origin only) revokes the session and ends the Keycloak SSO session (RP-initiated logout) |
+| 7. Back-channel logout | When an admin ends a session in Keycloak, or the user logs out elsewhere, Keycloak calls `POST /api/auth/backchannel-logout` and the app session is revoked at once |
+
+Logins, logouts, failures, expiries and revocations are written to the append-only `trustguard.audit_events` table.
+
+**Why a second sign-in after enrolment:** Keycloak verifies the enrolment code in a required action, not in the
+OTP login step, so the first login reports `amr=["pwd"]`. The app does not trust it. The user is asked to sign in once
+more (`prompt=login`) with a code from the new authenticator, which yields `amr=["pwd","otp"]`.
+
+### Demo users
+
+The realm import (`keycloak/import/trust-guard-realm.json`) creates:
+
+| Username | Role | Password |
+|---|---|---|
+| `tg.admin` | `tg-admin` (includes `tg-employee`) | `SEED_ADMIN_PASSWORD` in `.env` |
+| `tg.employee` | `tg-employee` | `SEED_EMPLOYEE_PASSWORD` in `.env` |
+
+At first sign-in each must scan a QR code with an authenticator app (Google Authenticator, Microsoft Authenticator, Aegis…).
+
+### End-to-end test
+
+`npm run test:e2e:auth` (stack and `npm run dev` running) creates a temporary Keycloak user and drives the real login pages
+over HTTP. It covers TOTP enrolment, MFA enforcement, logout, re-login, token refresh, back-channel logout, idle timeout
+and negative cases, then deletes the user. Expected: `26 passed, 0 failed`.
+
 ## Folder structure
 
 ```
 src/
 ├── app/                      # UI routes + API route handlers (Next.js App Router)
 │   ├── page.tsx              #   Landing / system status page
-│   └── api/health/route.ts   #   GET /api/health: DB + Keycloak health (JSON)
+│   ├── login/, dashboard/    #   Sign-in page, protected dashboard
+│   └── api/
+│       ├── health/           #   GET /api/health: DB + Keycloak health (JSON)
+│       └── auth/             #   login, callback, logout, backchannel-logout
+├── proxy.ts                  # Optimistic route guard (cookie presence only)
 ├── components/               # UI components (client-safe, no secrets)
 ├── config/env.ts             # Validated server-side environment (zod, server-only)
 └── server/                   # BFF / server-only logic
-    ├── auth/                 #   Keycloak OIDC configuration boundary
-    ├── session/              #   Session management & continuous verification
+    ├── auth/                 #   Keycloak OIDC client, login flow, back-channel token validation
+    ├── session/              #   Encrypted server-side sessions, requireSession(), timeouts, refresh
     ├── device-posture/       #   Device posture validation
     ├── risk-engine/          #   Risk scoring
     ├── policy-engine/        #   Access control / least-privilege decisions
@@ -79,6 +119,7 @@ set `DATABASE_SSL=true`, run `npm run db:migrate`, and start infra with `npm run
 | `npm run build` / `start` | Production build / serve |
 | `npm run typecheck` / `lint` | Static checks |
 | `npm run db:migrate` | Apply pending SQL migrations |
+| `npm run test:e2e:auth` | End-to-end authentication test against the running stack |
 | `npm run infra:up` | Start Keycloak (+ its DB) |
 | `npm run infra:up:local-db` | Also start the local Postgres stand-in |
 | `npm run infra:down` | Stop all containers (data volumes are kept) |

@@ -28,8 +28,8 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.4
-    # start-dev: HTTP on localhost for the prototype. --import-realm loads any
-    # realm JSON placed in ./keycloak/import (added in the authentication phase).
+    # start-dev: HTTP on localhost for the prototype. --import-realm imports the
+    # trust-guard realm from ./keycloak/import on first start (existing realms are kept).
     command: ["start-dev", "--import-realm"]
     restart: unless-stopped
     depends_on:
@@ -44,6 +44,16 @@ services:
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD in .env}
       KC_HOSTNAME: http://localhost:8080
       KC_HEALTH_ENABLED: "true"
+      # Placeholders substituted into keycloak/import/trust-guard-realm.json at import.
+      TG_APP_URL: ${APP_URL:-http://localhost:3000}
+      TG_KC_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-trust-guard-bff}
+      TG_KC_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?Set KEYCLOAK_CLIENT_SECRET in .env}
+      # Keycloak calls the app server-to-server; from inside Docker the host is host.docker.internal.
+      TG_BACKCHANNEL_LOGOUT_URL: ${KEYCLOAK_BACKCHANNEL_LOGOUT_URL:-http://host.docker.internal:3000/api/auth/backchannel-logout}
+      TG_SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?Set SEED_ADMIN_PASSWORD in .env}
+      TG_SEED_EMPLOYEE_PASSWORD: ${SEED_EMPLOYEE_PASSWORD:?Set SEED_EMPLOYEE_PASSWORD in .env}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8080:8080"
     volumes:
