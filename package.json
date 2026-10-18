@@ -15,7 +15,9 @@
     "infra:up:local-db": "docker compose --profile local-db up -d",
     "infra:down": "docker compose --profile local-db --profile app down",
     "test:e2e:auth": "tsx scripts/e2e-auth.ts",
-    "test:e2e:access": "tsx scripts/e2e-access.ts"
+    "test:e2e:access": "tsx scripts/e2e-access.ts",
+    "keycloak:upgrade": "tsx scripts/keycloak-upgrade.ts",
+    "test:e2e:admin": "tsx scripts/e2e-admin.ts"
   },
   "dependencies": {
     "jose": "^6.2.12",

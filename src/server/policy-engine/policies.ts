@@ -30,4 +30,17 @@ export const POLICIES: ResourcePolicy[] = [
     maxAuthAgeMinutes: 60,
     denySignals: ["AUTOMATION_DETECTED", "UA_MISMATCH", "INSECURE_CONTEXT"],
   },
+  {
+    id: "admin.manage.v1",
+    resource: "admin.manage",
+    description:
+      "Administrative actions (revoke sessions, suspend users, trust/block devices): administrators only, " +
+      "low risk or medium risk with a sign-in from the last 10 minutes, and never with a sign-in older than 30 minutes",
+    allowedRoles: ["tg-admin"],
+    allowUpTo: "low",
+    stepUpUpTo: "medium",
+    stepUpFreshMinutes: 10,
+    maxAuthAgeMinutes: 30,
+    denySignals: ["AUTOMATION_DETECTED", "UA_MISMATCH", "INSECURE_CONTEXT", "RECENT_FAILED_LOGINS"],
+  },
 ];

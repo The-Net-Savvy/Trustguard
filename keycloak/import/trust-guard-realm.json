@@ -106,6 +106,22 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "trust-guard-admin-api",
+      "name": "Trust Guard (admin API)",
+      "description": "Service account used by Trust Guard admin controls to end Keycloak sessions and suspend users",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${TG_KC_ADMIN_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "frontchannelLogout": false,
+      "fullScopeAllowed": true
     }
   ],
   "users": [
@@ -150,6 +166,17 @@
           "temporary": false
         }
       ]
+    },
+    {
+      "username": "service-account-trust-guard-admin-api",
+      "enabled": true,
+      "serviceAccountClientId": "trust-guard-admin-api",
+      "clientRoles": {
+        "realm-management": [
+          "view-users",
+          "manage-users"
+        ]
+      }
     }
   ],
   "authenticatorConfig": [

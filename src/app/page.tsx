@@ -7,12 +7,12 @@ export const dynamic = "force-dynamic";
 const PILLARS: [string, "Implemented" | "Planned"][] = [
   ["Identity-centric access control", "Implemented"],
   ["Multi-factor authentication", "Implemented"],
-  ["Device posture validation", "Planned"],
-  ["Continuous verification", "Planned"],
-  ["Least privilege", "Planned"],
-  ["Risk-aware access decisions", "Planned"],
+  ["Device posture validation", "Implemented"],
+  ["Continuous verification", "Implemented"],
+  ["Least privilege", "Implemented"],
+  ["Risk-aware access decisions", "Implemented"],
   ["Session management", "Implemented"],
-  ["Administrative controls", "Planned"],
+  ["Administrative controls", "Implemented"],
   ["Audit logging", "Implemented"],
 ];
 

@@ -48,6 +48,7 @@ services:
       TG_APP_URL: ${APP_URL:-http://localhost:3000}
       TG_KC_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-trust-guard-bff}
       TG_KC_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?Set KEYCLOAK_CLIENT_SECRET in .env}
+      TG_KC_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?Set KEYCLOAK_ADMIN_CLIENT_SECRET in .env (npm run keycloak:upgrade)}
       # Keycloak calls the app server-to-server; from inside Docker the host is host.docker.internal.
       TG_BACKCHANNEL_LOGOUT_URL: ${KEYCLOAK_BACKCHANNEL_LOGOUT_URL:-http://host.docker.internal:3000/api/auth/backchannel-logout}
       TG_SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?Set SEED_ADMIN_PASSWORD in .env}

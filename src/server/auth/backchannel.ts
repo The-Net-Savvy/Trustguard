@@ -27,6 +27,9 @@ export async function verifyLogoutToken(token: string): Promise<LogoutTokenClaim
       issuer: kc.issuer,
       audience: kc.clientId,
       maxTokenAge: "5m",
+      // The app server and Keycloak clocks are never perfectly in sync (on Windows the
+      // Docker VM clock and the host clock routinely drift by tens of seconds).
+      clockTolerance: 60,
       requiredClaims: ["iat", "jti", "events"],
     });
     const events = payload.events as Record<string, unknown> | undefined;

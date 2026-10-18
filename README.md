@@ -2,9 +2,9 @@
 
 **A Zero-Trust-Inspired Authentication Framework for Securing Remote Access in Nigerian Small and Medium Enterprises (SMEs)**: Master's research prototype.
 
-> Status: **Phase 3, Device posture, risk and least privilege.** On top of authentication (OIDC + mandatory
-> TOTP, server-side sessions, back-channel logout, audit log), every protected request is now evaluated against
-> device posture, a risk score and a least-privilege policy. Administrative controls follow.
+> Status: **Prototype complete (phases 1–4).** It covers OIDC sign-in with mandatory TOTP, server-side sessions,
+> device posture, risk scoring and least-privilege policies on every request, administrative controls, and an
+> append-only audit log. An optional evaluation phase (attack scenarios, measurements) can follow.
 
 ## Architecture
 
@@ -98,15 +98,54 @@ level. These need an installed agent or MDM, which is out of scope for this prot
 `X-Forwarded-For`. Next.js otherwise passes a client-supplied value through unchanged. Device binding does not
 depend on IP.
 
+## Administrative controls (phase 4)
+
+The admin console (`/admin`, role `tg-admin`) has five tabs: **Overview**, **Sessions**, **Devices**, **Users** and
+**Audit log**.
+
+| Action | Effect |
+|---|---|
+| End session | App session revoked and the matching Keycloak SSO session ended, so the user must sign in again with password + code |
+| Sign out everywhere | All of a user's sessions ended, in the app and in Keycloak |
+| Suspend / reactivate | Account disabled (or re-enabled) in Keycloak first, then all sessions ended. If Keycloak cannot be updated, nothing changes |
+| Trust device | The device no longer counts as new (removes the `NEW_DEVICE` risk signal) |
+| Block device | The device is denied everywhere, and its sessions end immediately |
+| Reset device | Back to *registered* (neither trusted nor blocked) |
+| Export audit log | The filtered audit log as CSV (formula-injection safe). The export is itself audited |
+
+**Who can act.** Viewing needs the `admin.console` policy. Every action needs the stricter `admin.manage` policy:
+low risk, or medium with a sign-in from the last 10 minutes, and never with a sign-in older than 30 minutes.
+Recent failed sign-ins deny it outright. Actions are plain same-origin form posts to `/api/admin/actions`.
+Every attempt is audited as `admin.action`, including refused and malformed ones. Admins cannot end their own
+current session, suspend themselves or block the device they are using.
+
+**Keycloak service account.** To end SSO sessions and disable accounts, the app uses the
+`trust-guard-admin-api` service account (client credentials). It holds only `view-users` and `manage-users`,
+not the Keycloak master admin. Without this step, a revoked user could sign straight back in through
+Keycloak's SSO cookie, with no password or code.
+
+**Upgrading an existing installation (realm imported before phase 4):**
+```bash
+git pull
+npm install
+npm run keycloak:upgrade   # adds KEYCLOAK_ADMIN_CLIENT_SECRET to .env and creates the service account
+npm run db:migrate
+npm run dev                # restart so the new .env value is loaded
+```
+
 ### Tests
 
 | Command | What it covers | Expected |
 |---|---|---|
-| `npm test` | Unit tests for posture evaluation, risk scoring and policy decisions (pure functions) | 31 passing |
+| `npm test` | Unit tests: posture evaluation, risk scoring, policy decisions, admin input parsing, CSV escaping | 41 passing |
 | `npm run test:e2e:auth` | Phase 2: login, MFA, logout, refresh, back-channel logout, timeouts, open redirects | 33 passed |
 | `npm run test:e2e:access` | Phase 3: device verification, least privilege, posture changes, high risk, stale posture, stolen cookie, concurrent reports, admin step-up | 30 passed |
+| `npm run test:e2e:admin` | Phase 4: admin-only access, CSRF, self-protection, ending sessions in app + Keycloak, trust/block/reset devices, suspend/reactivate, fresher sign-in for actions, audit filters and CSV export | 47 passed |
 
-The e2e tests need the stack and `npm run dev` running. They create temporary Keycloak users and delete them afterwards.
+The e2e tests need the stack and `npm run dev` running. They create temporary Keycloak users and delete
+them afterwards. The users' rows stay in the app database, because the audit log that references them is
+append-only. To start from an empty app database, run `docker compose --profile local-db down` and then
+`docker volume rm trust-guard_app-db-data`, then `npm run infra:up:local-db` and `npm run db:migrate`.
 
 ## Folder structure
 
@@ -116,11 +155,13 @@ src/
 │   ├── page.tsx              #   Landing / system status page
 │   ├── login/, dashboard/    #   Sign-in page, protected dashboard
 │   ├── verify-device/        #   Device posture collection after sign-in
-│   ├── admin/, access-denied/ #  Admin console (audit view), explained denials
+│   ├── admin/                #   Admin console: overview, sessions, devices, users, audit log
+│   ├── access-denied/        #   Explained denials
 │   └── api/
 │       ├── health/           #   GET /api/health: DB + Keycloak health (JSON)
 │       ├── auth/             #   login, callback, logout, backchannel-logout
-│       └── device/posture/   #   POST: browser posture reports (binding + heartbeat)
+│       ├── device/posture/   #   POST: browser posture reports (binding + heartbeat)
+│       └── admin/            #   POST actions (admin.manage policy), GET audit CSV export
 ├── proxy.ts                  # Optimistic route guard (cookie presence) + forwards request path
 ├── components/               # UI components (client-safe, no secrets)
 ├── config/env.ts             # Validated server-side environment (zod, server-only)
@@ -132,7 +173,7 @@ src/
     ├── risk-engine/          #   Risk scoring and context helpers (pure)
     ├── policy-engine/        #   Policies as code + decision point (pure)
     ├── audit/                #   Audit logging
-    ├── admin/                #   Administrative controls
+    ├── admin/                #   Admin actions, read models, CSV export, input validation
     ├── db/                   #   PostgreSQL pool + query helper
     └── health/               #   Infrastructure health checks
 db/migrations/                # Numbered SQL migrations (applied by scripts/db-migrate.ts)
@@ -178,6 +219,8 @@ set `DATABASE_SSL=true`, run `npm run db:migrate`, and start infra with `npm run
 | `npm test` | Unit tests (posture, risk, policy) |
 | `npm run test:e2e:auth` | End-to-end authentication test against the running stack |
 | `npm run test:e2e:access` | End-to-end device/risk/policy test against the running stack |
+| `npm run test:e2e:admin` | End-to-end administrative controls test against the running stack |
+| `npm run keycloak:upgrade` | Add phase-4 Keycloak settings to a realm imported earlier (idempotent) |
 | `npm run infra:up` | Start Keycloak (+ its DB) |
 | `npm run infra:up:local-db` | Also start the local Postgres stand-in |
 | `npm run infra:down` | Stop all containers (data volumes are kept) |

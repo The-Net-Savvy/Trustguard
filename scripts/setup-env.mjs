@@ -26,6 +26,7 @@ const generated = {
   KEYCLOAK_ADMIN_PASSWORD: password(),
   KEYCLOAK_DB_PASSWORD: secret(24),
   KEYCLOAK_CLIENT_SECRET: secret(),
+  KEYCLOAK_ADMIN_CLIENT_SECRET: secret(),
   SESSION_SECRET: secret(),
   SEED_ADMIN_PASSWORD: password(),
   SEED_EMPLOYEE_PASSWORD: password(),

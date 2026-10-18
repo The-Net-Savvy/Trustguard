@@ -26,6 +26,9 @@ const envSchema = z.object({
   KEYCLOAK_ISSUER: optionalUrl,
   KEYCLOAK_CLIENT_ID: optionalString,
   KEYCLOAK_CLIENT_SECRET: optionalString,
+  // Service account used by admin controls to end Keycloak sessions and suspend users.
+  KEYCLOAK_ADMIN_CLIENT_ID: z.string().default("trust-guard-admin-api"),
+  KEYCLOAK_ADMIN_CLIENT_SECRET: optionalString,
 
   SESSION_SECRET: z.preprocess(emptyToUndefined, z.string().min(32).optional()),
   // Session lifetime: sliding idle timeout and hard absolute limit.
