@@ -17,7 +17,9 @@
     "test:e2e:auth": "tsx scripts/e2e-auth.ts",
     "test:e2e:access": "tsx scripts/e2e-access.ts",
     "keycloak:upgrade": "tsx scripts/keycloak-upgrade.ts",
-    "test:e2e:admin": "tsx scripts/e2e-admin.ts"
+    "test:e2e:admin": "tsx scripts/e2e-admin.ts",
+    "eval:security": "tsx scripts/eval-security.ts",
+    "eval:performance": "tsx scripts/eval-performance.ts"
   },
   "dependencies": {
     "jose": "^6.2.12",

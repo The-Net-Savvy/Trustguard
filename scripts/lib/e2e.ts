@@ -96,7 +96,7 @@ export class Browser {
 // ---------------------------------------------------------------------------
 export const decodeHtml = (s: string) => s.replace(/&amp;/g, "&").replace(/&#x3D;/g, "=");
 
-function formAction(html: string, formId: string): string {
+export function formAction(html: string, formId: string): string {
   const m =
     html.match(new RegExp(`<form[^>]*id="${formId}"[^>]*action="([^"]+)"`)) ??
     html.match(new RegExp(`<form[^>]*action="([^"]+)"[^>]*id="${formId}"`));
@@ -104,7 +104,7 @@ function formAction(html: string, formId: string): string {
   return decodeHtml(m[1]);
 }
 
-function hiddenInput(html: string, name: string): string {
+export function hiddenInput(html: string, name: string): string {
   const m =
     html.match(new RegExp(`name="${name}"[^>]*value="([^"]*)"`)) ??
     html.match(new RegExp(`value="([^"]*)"[^>]*name="${name}"`));
@@ -326,4 +326,42 @@ export async function login(
     done = await b.follow(new URL(target, APP));
   }
   return { finalUrl: done.url, totpSecret, verifiedDevice };
+}
+
+// ---------------------------------------------------------------------------
+// Step-by-step login (for attack scenarios that stop part-way or tamper with a step)
+// ---------------------------------------------------------------------------
+
+/** Start an app login and return the Keycloak sign-in page HTML. */
+export async function openSignIn(b: Browser, returnTo = "/dashboard", reauth = false): Promise<string> {
+  const start = await b.request(
+    `${APP}/api/auth/login?returnTo=${encodeURIComponent(returnTo)}${reauth ? "&reauth=1" : ""}`,
+  );
+  return (await b.follow(start.headers.get("location")!)).res.text();
+}
+
+/** Submit username + password on a Keycloak sign-in page; returns the next page's HTML. */
+export async function submitPassword(b: Browser, html: string, username: string, password: string): Promise<string> {
+  let res = await b.request(formAction(html, "kc-form-login"), {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ username, password, credentialId: "" }),
+  });
+  if (res.status >= 300 && res.status < 400) res = (await b.follow(new URL(res.headers.get("location")!, KC))).res;
+  return res.text();
+}
+
+/** Submit a one-time code on Keycloak's OTP page. A 302 means it was accepted. */
+export async function submitOtp(b: Browser, html: string, code: string): Promise<Response> {
+  return b.request(formAction(html, "kc-otp-login-form"), {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ otp: code }),
+  });
+}
+
+/** Keycloak's visible error text on a page, if any. */
+export function keycloakError(html: string): string | null {
+  const m = html.match(/kc-feedback-text[^>]*>([^<]*)/) ?? html.match(/input-error[^>]*>\s*([^<]*)/);
+  return m ? m[1].trim() : null;
 }

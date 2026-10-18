@@ -4,7 +4,8 @@
 
 > Status: **Prototype complete (phases 1–4).** It covers OIDC sign-in with mandatory TOTP, server-side sessions,
 > device posture, risk scoring and least-privilege policies on every request, administrative controls, and an
-> append-only audit log. An optional evaluation phase (attack scenarios, measurements) can follow.
+> append-only audit log. **Evaluation (phase 5):** see [docs/evaluation](docs/evaluation/README.md). It covers 22 attack
+> scenarios (20 mitigated, 2 documented limitations), the NIST SP 800-207 mapping, and performance (about +12 ms per protected request).
 
 ## Architecture
 
@@ -220,6 +221,8 @@ set `DATABASE_SSL=true`, run `npm run db:migrate`, and start infra with `npm run
 | `npm run test:e2e:auth` | End-to-end authentication test against the running stack |
 | `npm run test:e2e:access` | End-to-end device/risk/policy test against the running stack |
 | `npm run test:e2e:admin` | End-to-end administrative controls test against the running stack |
+| `npm run eval:security` | Security evaluation: 22 attack scenarios → `docs/evaluation/results/security.md` |
+| `npm run eval:performance` | Performance evaluation (run against `npm start`) → `docs/evaluation/results/performance.md` |
 | `npm run keycloak:upgrade` | Add phase-4 Keycloak settings to a realm imported earlier (idempotent) |
 | `npm run infra:up` | Start Keycloak (+ its DB) |
 | `npm run infra:up:local-db` | Also start the local Postgres stand-in |

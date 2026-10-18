@@ -1,0 +1,285 @@
+{
+  "generatedAt": "2026-10-18T03:23:02.646Z",
+  "counts": {
+    "mitigated": 20,
+    "limitation": 2
+  },
+  "results": [
+    {
+      "id": "S01",
+      "title": "Stolen password, no second factor",
+      "stride": "Spoofing",
+      "tenets": [
+        6
+      ],
+      "attack": "Attacker knows an enrolled user's password and guesses the one-time code.",
+      "control": "Keycloak browser flow requires password AND OTP; the app also requires amr to contain a second factor.",
+      "outcome": "mitigated",
+      "evidence": "wrong code answered with HTTP 200 \"Invalid authenticator code.\"; no app session issued"
+    },
+    {
+      "id": "S02",
+      "title": "Online brute force of the one-time code",
+      "stride": "Spoofing",
+      "tenets": [
+        6,
+        7
+      ],
+      "attack": "Attacker with the password submits many one-time codes.",
+      "control": "Keycloak brute-force detection: temporary lockout after 5 failures (60 s, growing to 15 min).",
+      "outcome": "mitigated",
+      "evidence": "account locked after 2 rapid failures (disabled=true, quick-login detection); correct credentials refused while locked; lockout cleared afterwards"
+    },
+    {
+      "id": "S03",
+      "title": "Attacker enrols their own authenticator on a new account",
+      "stride": "Spoofing",
+      "tenets": [
+        6
+      ],
+      "attack": "Attacker obtains a new user's initial password before the user's first sign-in and completes TOTP enrolment.",
+      "control": "None in the prototype: first sign-in trusts whoever holds the initial password (trust-on-first-use).",
+      "outcome": "limitation",
+      "evidence": "attacker's authenticator was registered on the account. Mitigation: deliver initial passwords out of band as temporary, or use enrolment links"
+    },
+    {
+      "id": "S04",
+      "title": "Tampered OAuth state on the callback",
+      "stride": "Tampering",
+      "tenets": [
+        6
+      ],
+      "attack": "Attacker sends the victim a callback URL with a forged state/code (login CSRF).",
+      "control": "state, nonce and PKCE verifier are bound to an encrypted, short-lived transaction cookie.",
+      "outcome": "mitigated",
+      "evidence": "callback answered 303 -> /login?error=token_exchange_failed&returnTo=%2Fdashboard"
+    },
+    {
+      "id": "S05",
+      "title": "Cross-site request forgery",
+      "stride": "Tampering",
+      "tenets": [
+        6
+      ],
+      "attack": "A malicious site makes the admin's browser POST to logout, admin actions and the posture API.",
+      "control": "Origin check on every state-changing endpoint, plus SameSite=Lax session cookie.",
+      "outcome": "mitigated",
+      "evidence": "logout/admin/posture answered 403/403/403; target account unchanged"
+    },
+    {
+      "id": "S06",
+      "title": "Open redirect after sign-in",
+      "stride": "Spoofing",
+      "tenets": [
+        6
+      ],
+      "attack": "Phishing link with returnTo pointing to another site (incl. tab/newline and backslash tricks).",
+      "control": "returnTo is resolved against the app origin; anything off-origin becomes /dashboard.",
+      "outcome": "mitigated",
+      "evidence": "6 hostile values tried, 0 escaped the app"
+    },
+    {
+      "id": "S07",
+      "title": "Privilege escalation by an employee",
+      "stride": "Elevation of privilege",
+      "tenets": [
+        3,
+        4,
+        6
+      ],
+      "attack": "Employee opens admin pages, posts admin actions and requests the audit export.",
+      "control": "Deny-by-default policy engine; admin.console / admin.manage require the tg-admin role from Keycloak.",
+      "outcome": "mitigated",
+      "evidence": "admin page -> 307 /access-denied?resource=admin.console&returnTo=%2Fadmin%2Fusers; action -> access-denied; export -> 403"
+    },
+    {
+      "id": "S08",
+      "title": "Automated browser (bot) inside a valid session",
+      "stride": "Spoofing",
+      "tenets": [
+        4,
+        5
+      ],
+      "attack": "Session is driven by automation (navigator.webdriver).",
+      "control": "Device posture is re-reported and evaluated on every request; policy denies.",
+      "outcome": "mitigated",
+      "evidence": "dashboard -> 307, decision DENY_SIGNAL (risk 100); access restored once the device was healthy"
+    },
+    {
+      "id": "S09",
+      "title": "Forged posture report",
+      "stride": "Spoofing",
+      "tenets": [
+        4,
+        5
+      ],
+      "attack": "Client reports a different browser than it actually uses.",
+      "control": "Device posture is re-reported and evaluated on every request; policy denies.",
+      "outcome": "mitigated",
+      "evidence": "dashboard -> 307, decision DENY_SIGNAL (risk 70); access restored once the device was healthy"
+    },
+    {
+      "id": "S10",
+      "title": "Non-compliant device",
+      "stride": "Spoofing",
+      "tenets": [
+        4,
+        5
+      ],
+      "attack": "Outdated browser on a page without a secure context.",
+      "control": "Device posture is re-reported and evaluated on every request; policy denies.",
+      "outcome": "mitigated",
+      "evidence": "dashboard -> 307, decision RISK_TOO_HIGH (risk 90); access restored once the device was healthy"
+    },
+    {
+      "id": "S11",
+      "title": "Forged back-channel logout",
+      "stride": "Denial of service",
+      "tenets": [
+        6
+      ],
+      "attack": "Attacker posts logout tokens (unsigned, and signed with their own key) to end a victim's session.",
+      "control": "Logout tokens must be signed by the realm key (JWKS), with correct issuer, audience, event and age.",
+      "outcome": "mitigated",
+      "evidence": "unsigned -> 400, attacker-signed -> 400; victim session active"
+    },
+    {
+      "id": "S12",
+      "title": "Database leak exposes usable sessions or tokens",
+      "stride": "Information disclosure",
+      "tenets": [
+        2
+      ],
+      "attack": "Attacker reads the sessions table (e.g. backup leak) and tries to reuse what is stored.",
+      "control": "Only SHA-256 hashes of session ids are stored; Keycloak tokens are AES-256-GCM encrypted.",
+      "outcome": "mitigated",
+      "evidence": "0 of 75 stored sessions contain a raw JWT or cookie value; presenting the stored hash as a cookie -> 307"
+    },
+    {
+      "id": "S13",
+      "title": "Tampering with the audit trail",
+      "stride": "Repudiation",
+      "tenets": [
+        7
+      ],
+      "attack": "An insider with application-level database access edits or deletes audit records.",
+      "control": "Trigger makes trustguard.audit_events append-only (UPDATE and DELETE raise errors).",
+      "outcome": "mitigated",
+      "evidence": "UPDATE and DELETE rejected: \"audit_events is append-only\". (A database owner could still drop the trigger.)"
+    },
+    {
+      "id": "S14",
+      "title": "Spoofed client IP address",
+      "stride": "Spoofing",
+      "tenets": [
+        4,
+        7
+      ],
+      "attack": "Client sends a forged X-Forwarded-For header to choose the IP the app sees.",
+      "control": "Only effective behind a reverse proxy that overwrites X-Forwarded-For (not part of the prototype).",
+      "outcome": "limitation",
+      "evidence": "app recorded the attacker-chosen IP 198.51.100.77; IP-based signals are only trustworthy behind a proxy"
+    },
+    {
+      "id": "S15",
+      "title": "Admin action from an old sign-in",
+      "stride": "Elevation of privilege",
+      "tenets": [
+        3,
+        6
+      ],
+      "attack": "Someone uses an admin's unattended browser 31 minutes after sign-in to suspend a user.",
+      "control": "admin.manage policy: actions need a sign-in under 30 minutes old (step-up otherwise).",
+      "outcome": "mitigated",
+      "evidence": "action redirected to step-up re-authentication; user not suspended"
+    },
+    {
+      "id": "S16",
+      "title": "Abandoned session reused later",
+      "stride": "Spoofing",
+      "tenets": [
+        3
+      ],
+      "attack": "A session left idle for 2 hours is picked up again.",
+      "control": "30-minute sliding idle timeout and 8-hour absolute lifetime, enforced server-side.",
+      "outcome": "mitigated",
+      "evidence": "request -> 307; session expired (idle_timeout)"
+    },
+    {
+      "id": "S17",
+      "title": "Session fixation",
+      "stride": "Spoofing",
+      "tenets": [
+        3
+      ],
+      "attack": "Attacker plants a known session cookie in the victim's browser before the victim signs in.",
+      "control": "A new random session id is issued at every sign-in; the planted value is never a valid session.",
+      "outcome": "mitigated",
+      "evidence": "victim received a new session id; planted cookie -> 307"
+    },
+    {
+      "id": "S18",
+      "title": "Authorization code replay",
+      "stride": "Spoofing",
+      "tenets": [
+        6
+      ],
+      "attack": "Attacker captures the victim's callback URL (code + state) and replays it.",
+      "control": "Code is bound to the victim's transaction cookie and PKCE verifier, and is single-use at Keycloak.",
+      "outcome": "mitigated",
+      "evidence": "replay from attacker -> /login?error=transaction_missing; replay in victim's browser -> /login?error=transaction_missing"
+    },
+    {
+      "id": "S19",
+      "title": "Tokens exposed to the browser (XSS impact)",
+      "stride": "Information disclosure",
+      "tenets": [
+        2
+      ],
+      "attack": "Script injected into a page tries to read access/refresh/ID tokens or the session cookie.",
+      "control": "BFF pattern: tokens never leave the server; the session cookie is HttpOnly and SameSite=Lax.",
+      "outcome": "mitigated",
+      "evidence": "7 app responses during sign-in, 0 contained a JWT; session cookie HttpOnly + SameSite=Lax: true"
+    },
+    {
+      "id": "S20",
+      "title": "Stolen session cookie used from another device",
+      "stride": "Spoofing",
+      "tenets": [
+        3,
+        4,
+        5
+      ],
+      "attack": "Attacker copies the victim's session cookie (malware, shared PC) into their own browser.",
+      "control": "Sessions are bound to the device cookie of the browser that verified posture; mismatch revokes the session.",
+      "outcome": "mitigated",
+      "evidence": "thief -> 307 /login?error=device_mismatch; session revoked (device_mismatch), victim must sign in again"
+    },
+    {
+      "id": "S21",
+      "title": "Revoked user signs straight back in via SSO",
+      "stride": "Elevation of privilege",
+      "tenets": [
+        3,
+        6
+      ],
+      "attack": "After an admin ends their session, the user relies on Keycloak's SSO cookie to get back in silently.",
+      "control": "Ending a session also ends the Keycloak SSO session via the least-privilege service account.",
+      "outcome": "mitigated",
+      "evidence": "after revocation the sign-in shows the password form again (no silent SSO)"
+    },
+    {
+      "id": "S22",
+      "title": "Suspended employee keeps working",
+      "stride": "Elevation of privilege",
+      "tenets": [
+        3,
+        6
+      ],
+      "attack": "A suspended user (e.g. leaving the company) tries to continue or sign in again.",
+      "control": "Suspension disables the Keycloak account first, then ends every session.",
+      "outcome": "mitigated",
+      "evidence": "sign-in refused by Keycloak: \"Account is disabled, contact your administrator.\" (account reactivated afterwards)"
+    }
+  ]
+}
