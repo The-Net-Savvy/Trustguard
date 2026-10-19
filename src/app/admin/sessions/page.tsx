@@ -17,27 +17,27 @@ export default async function AdminSessionsPage({ searchParams }: PageProps<"/ad
 
   return (
     <AdminShell active="/admin/sessions" ctx={ctx} manage={manage} flash={flashFrom(await searchParams)}>
-      <h2 className="mb-1 text-lg font-semibold">Active sessions ({sessions.length})</h2>
-      <p className="mb-3 text-sm text-slate-500">
+      <h2 className="mb-1 text-sm font-semibold">{sessions.length} active sessions</h2>
+      <p className="mb-3 text-sm text-muted">
         Ending a session signs the user out immediately, here and in Keycloak, so they must sign in again with a
         password and one-time code.
       </p>
       <TableFrame>
         <table className={TABLE}>
           <THead cols={["User", "Device", "IP", "Signed in", "Last activity", "Risk", ""]} />
-          <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+          <tbody className="divide-y divide-line">
             {sessions.map((s) => {
               const own = s.id === ctx.session.id;
               return (
                 <tr key={s.id}>
                   <td className={TD}>
                     <span className="font-medium">{s.username}</span>
-                    {own && <span className="ml-1 text-xs text-slate-500">(you, this session)</span>}
+                    {own && <span className="ml-1 text-xs text-muted">(you, this session)</span>}
                   </td>
                   <td className={TD}>
                     {s.device_label ?? <span className="text-slate-400">not verified yet</span>}
                     {s.device_status && s.device_status !== "registered" && (
-                      <span className="ml-1 text-xs text-slate-500">({s.device_status})</span>
+                      <span className="ml-1 text-xs text-muted">({s.device_status})</span>
                     )}
                   </td>
                   <td className={`${TD} font-mono text-xs`}>{s.ip_address ?? "—"}</td>

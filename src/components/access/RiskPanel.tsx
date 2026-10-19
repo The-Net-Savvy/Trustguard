@@ -1,55 +1,65 @@
+import { CircleCheck, CircleX } from "lucide-react";
+import { Card, CardTitle, Pill, type Tone } from "@/components/ui/cards";
 import type { PostureAssessment } from "@/server/device-posture/types";
 import type { RiskAssessment, RiskLevel } from "@/server/risk-engine/types";
 
-const LEVEL_STYLE: Record<RiskLevel, string> = {
-  low: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
-  medium: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
-  high: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
-};
+export const LEVEL_TONE: Record<RiskLevel, Tone> = { low: "good", medium: "warn", high: "bad" };
 
 export function RiskBadge({ level, score }: { level: RiskLevel; score: number }) {
   return (
-    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${LEVEL_STYLE[level]}`}>
+    <Pill tone={LEVEL_TONE[level]}>
       {level[0].toUpperCase() + level.slice(1)} risk · {score}/100
-    </span>
+    </Pill>
   );
 }
 
 /** Risk signals and device posture checks, as evaluated for the current request. */
 export function RiskPanel({ risk, posture }: { risk: RiskAssessment; posture: PostureAssessment }) {
+  const passed = posture.checks.filter((c) => c.passed).length;
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold">Risk signals</h3>
-          <RiskBadge level={risk.level} score={risk.score} />
-        </div>
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Card>
+        <CardTitle title="Risk signals" hint="What raised the score on this request" />
         {risk.signals.length === 0 ? (
-          <p className="text-sm text-slate-500">No risk signals.</p>
+          <p className="text-sm text-muted">No risk signals. Everything about this request looks normal.</p>
         ) : (
-          <ul className="space-y-2 text-sm">
+          <ul className="space-y-4">
             {risk.signals.map((s) => (
-              <li key={s.code} className="flex justify-between gap-3">
-                <span>{s.description}</span>
-                <span className="shrink-0 tabular-nums text-slate-500">+{s.weight}</span>
+              <li key={s.code}>
+                <div className="mb-1.5 flex items-baseline justify-between gap-3 text-sm">
+                  <span>{s.description}</span>
+                  <span className="shrink-0 font-semibold tabular-nums text-ink">+{s.weight}</span>
+                </div>
+                <div className="h-2 rounded-full bg-panel">
+                  <div
+                    className={`h-2 rounded-full ${s.weight >= 40 ? "bg-rose-500" : s.weight >= 20 ? "bg-amber-400" : "bg-brand"}`}
+                    style={{ width: `${Math.min(100, s.weight)}%` }}
+                  />
+                </div>
               </li>
             ))}
           </ul>
         )}
-      </div>
-      <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
-        <h3 className="mb-3 text-sm font-semibold">Device checks</h3>
-        <ul className="space-y-2 text-sm">
+        <div className="mt-5 flex items-center justify-between border-t border-line pt-4 text-sm">
+          <span className="text-muted">Total score (low &lt; 30 · medium 30–59 · high ≥ 60)</span>
+          <RiskBadge level={risk.level} score={risk.score} />
+        </div>
+      </Card>
+      <Card>
+        <CardTitle title="Device checks" hint={`${passed} of ${posture.checks.length} passed`} />
+        <ul className="space-y-3">
           {posture.checks.map((c) => (
-            <li key={c.id} className="flex gap-2">
-              <span aria-hidden className={c.passed ? "text-emerald-600" : "text-red-600"}>
-                {c.passed ? "✓" : "✗"}
-              </span>
-              <span className={c.passed ? "" : "font-medium"}>{c.detail}</span>
+            <li key={c.id} className="flex items-start gap-3 text-sm">
+              {c.passed ? (
+                <CircleCheck className="mt-0.5 size-[18px] shrink-0 text-emerald-500" strokeWidth={2} aria-label="Passed" />
+              ) : (
+                <CircleX className="mt-0.5 size-[18px] shrink-0 text-rose-500" strokeWidth={2} aria-label="Failed" />
+              )}
+              <span className={c.passed ? "text-ink/80" : "font-semibold text-ink"}>{c.detail}</span>
             </li>
           ))}
         </ul>
-      </div>
+      </Card>
     </div>
   );
 }

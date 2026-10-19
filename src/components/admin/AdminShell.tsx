@@ -1,17 +1,17 @@
-import Link from "next/link";
+import { CircleAlert, CircleCheck, ShieldAlert } from "lucide-react";
 import { RiskBadge } from "@/components/access/RiskPanel";
-import { LogoutButton } from "@/components/auth/LogoutButton";
 import { PostureHeartbeat } from "@/components/device/PostureHeartbeat";
+import { AppShell, PageHeader } from "@/components/shell/AppShell";
 import type { AccessContext } from "@/server/access/require-access";
 import type { PolicyDecision } from "@/server/policy-engine/types";
 
-const TABS = [
-  ["/admin", "Overview"],
-  ["/admin/sessions", "Sessions"],
-  ["/admin/devices", "Devices"],
-  ["/admin/users", "Users"],
-  ["/admin/audit", "Audit log"],
-] as const;
+const PAGES: Record<string, { title: string; subtitle: string }> = {
+  "/admin": { title: "Security overview", subtitle: "Sessions, devices and access decisions across the company." },
+  "/admin/sessions": { title: "Active sessions", subtitle: "Who is signed in, from which device, at what risk." },
+  "/admin/devices": { title: "Devices", subtitle: "Trust or block the browsers and devices people sign in from." },
+  "/admin/users": { title: "Users", subtitle: "Accounts, roles and activity. Suspend access in one step." },
+  "/admin/audit": { title: "Audit log", subtitle: "Every sign-in, access decision and admin action. Append-only." },
+};
 
 const NOTICES: Record<string, string> = {
   session_revoked: "Session ended. The user's Keycloak session was ended too.",
@@ -40,6 +40,8 @@ export function flashFrom(params: Record<string, string | string[] | undefined>)
   return { notice: one(params.notice), error: one(params.error), warning: one(params.warning) };
 }
 
+const BANNER = "mb-4 flex items-start gap-3 rounded-2xl px-4 py-3 text-sm";
+
 export function AdminShell({
   active,
   ctx,
@@ -53,77 +55,59 @@ export function AdminShell({
   flash: Flash;
   children: React.ReactNode;
 }) {
+  const page = PAGES[active] ?? PAGES["/admin"];
   const notice = flash.notice ? NOTICES[flash.notice] : undefined;
   const error = flash.error ? ERRORS[flash.error] : undefined;
 
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6">
+    <AppShell user={ctx.user} active={active}>
       <PostureHeartbeat />
-      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Trust Guard</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight">Admin console</h1>
-          <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-            Signed in as {ctx.user.username} · <RiskBadge level={ctx.risk.level} score={ctx.risk.score} />
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Link
-            href="/dashboard"
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
-          >
-            Dashboard
-          </Link>
-          <LogoutButton />
-        </div>
-      </header>
-
-      <nav className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200 [scrollbar-width:none] dark:border-slate-800 [&::-webkit-scrollbar]:hidden">
-        {TABS.map(([href, label]) => (
-          <Link
-            key={href}
-            href={href}
-            aria-current={active === href ? "page" : undefined}
-            className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${
-              active === href
-                ? "border-slate-900 text-slate-900 dark:border-slate-100 dark:text-slate-100"
-                : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-            }`}
-          >
-            {label}
-          </Link>
-        ))}
-      </nav>
+      <PageHeader
+        title={page.title}
+        subtitle={page.subtitle}
+        aside={
+          <span className="flex items-center gap-2 text-sm text-muted">
+            Your access <RiskBadge level={ctx.risk.level} score={ctx.risk.score} />
+          </span>
+        }
+      />
 
       {manage && manage.decision !== "allow" && (
-        <p className="mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          {manage.decision === "step_up" ? (
-            <>
-              Admin actions need a recent sign-in ({manage.explanation}){" "}
-              <a className="font-medium underline" href={`/login?returnTo=${encodeURIComponent(active)}&reason=step_up`}>
-                Confirm it is you
-              </a>
-            </>
-          ) : (
-            <>Admin actions are not available right now: {manage.explanation}</>
-          )}
+        <p className={`${BANNER} bg-amber-50 text-amber-900 ring-1 ring-amber-200`}>
+          <ShieldAlert className="mt-0.5 size-4 shrink-0" />
+          <span>
+            {manage.decision === "step_up" ? (
+              <>
+                Admin actions need a recent sign-in ({manage.explanation}){" "}
+                <a className="font-semibold underline" href={`/login?returnTo=${encodeURIComponent(active)}&reason=step_up`}>
+                  Confirm it is you
+                </a>
+              </>
+            ) : (
+              <>Admin actions are not available right now: {manage.explanation}</>
+            )}
+          </span>
         </p>
       )}
       {notice && (
-        <p role="status" className="mb-4 rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
-          {notice}
-          {flash.warning === "idp_not_synced" &&
-            " Warning: Keycloak could not be updated, so the user may still have an SSO session."}
+        <p role="status" className={`${BANNER} bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200`}>
+          <CircleCheck className="mt-0.5 size-4 shrink-0" />
+          <span>
+            {notice}
+            {flash.warning === "idp_not_synced" &&
+              " Warning: Keycloak could not be updated, so the user may still have an SSO session."}
+          </span>
         </p>
       )}
       {error && (
-        <p role="alert" className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
-          {error}
+        <p role="alert" className={`${BANNER} bg-rose-50 text-rose-900 ring-1 ring-rose-200`}>
+          <CircleAlert className="mt-0.5 size-4 shrink-0" />
+          <span>{error}</span>
         </p>
       )}
 
       {children}
-    </main>
+    </AppShell>
   );
 }
 
@@ -131,22 +115,21 @@ export function formatTime(d: Date | null) {
   return d ? d.toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" }) : "—";
 }
 
-export const TABLE = "w-full min-w-[720px] text-left text-sm";
-export const TH = "px-3 py-2 font-medium";
-export const TD = "px-3 py-2 align-top";
+export const TABLE = "w-full min-w-[760px] text-left text-sm";
+export const TH = "px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted";
+export const TD = "px-4 py-3.5 align-top";
 
+/** A white rounded card holding a horizontally scrollable table. */
 export function TableFrame({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">{children}</div>
-  );
+  return <div className="overflow-x-auto rounded-3xl bg-card p-2">{children}</div>;
 }
 
 export function THead({ cols }: { cols: string[] }) {
   return (
-    <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-900">
-      <tr>
-        {cols.map((c) => (
-          <th key={c} className={TH}>
+    <thead>
+      <tr className="[&>th:first-child]:rounded-l-2xl [&>th:last-child]:rounded-r-2xl bg-panel">
+        {cols.map((c, i) => (
+          <th key={`${c}-${i}`} className={TH}>
             {c}
           </th>
         ))}

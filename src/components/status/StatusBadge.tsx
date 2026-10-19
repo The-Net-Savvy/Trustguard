@@ -1,9 +1,9 @@
 import type { ComponentStatus } from "@/server/health/checks";
 
 const styles: Record<ComponentStatus, string> = {
-  ok: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
-  not_configured: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
-  error: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+  ok: "bg-emerald-50 text-emerald-600 ring-emerald-200",
+  not_configured: "bg-amber-50 text-amber-700 ring-amber-200",
+  error: "bg-rose-50 text-rose-600 ring-rose-200",
 };
 
 const labels: Record<ComponentStatus, string> = {
@@ -14,7 +14,7 @@ const labels: Record<ComponentStatus, string> = {
 
 export function StatusBadge({ status }: { status: ComponentStatus }) {
   return (
-    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${styles[status]}`}>
+    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${styles[status]}`}>
       {labels[status]}
     </span>
   );

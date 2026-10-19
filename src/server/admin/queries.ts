@@ -165,3 +165,29 @@ export async function auditEventTypes(): Promise<string[]> {
   );
   return rows.map((r) => r.event_type);
 }
+
+/** Security events per day for the last `days` days (oldest first, zero-filled), in UTC. */
+export async function eventsPerDay(days = 7): Promise<{ day: string; events: number }[]> {
+  const { rows } = await query<{ day: string; events: number }>(
+    `select to_char(d, 'YYYY-MM-DD') as day,
+            (select count(*)::int from trustguard.audit_events a
+              where a.occurred_at >= d and a.occurred_at < d + interval '1 day') as events
+       from generate_series(current_date - ($1::int - 1), current_date, interval '1 day') as d
+      order by d`,
+    [days],
+  );
+  return rows;
+}
+
+/** Event outcomes over the last `days` days, grouped as allowed / step-up / denied. */
+export async function outcomeTotals(days = 7): Promise<{ allowed: number; stepUp: number; denied: number }> {
+  const { rows } = await query<{ allowed: number; step_up: number; denied: number }>(
+    `select count(*) filter (where outcome in ('success', 'allow'))::int as allowed,
+            count(*) filter (where outcome = 'step_up')::int as step_up,
+            count(*) filter (where outcome in ('failure', 'deny'))::int as denied
+       from trustguard.audit_events
+      where occurred_at > now() - make_interval(days => $1)`,
+    [days],
+  );
+  return { allowed: rows[0].allowed, stepUp: rows[0].step_up, denied: rows[0].denied };
+}

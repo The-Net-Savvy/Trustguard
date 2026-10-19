@@ -43,7 +43,7 @@ export function ActionButton({
       <button
         type="submit"
         disabled={disabled}
-        className={`whitespace-nowrap rounded-md border px-2.5 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${tones[tone]}`}
+        className={`whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${tones[tone]}`}
       >
         {label}
       </button>

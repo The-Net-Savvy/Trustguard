@@ -26,7 +26,7 @@ export function PostureCheck({ returnTo }: { returnTo: string }) {
 
   if (failed) {
     return (
-      <div role="alert" className="mt-6 text-sm text-red-700 dark:text-red-300">
+      <div role="alert" className="mt-6 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-1 ring-rose-200">
         The device check could not be completed.{" "}
         <button type="button" className="underline" onClick={() => window.location.reload()}>
           Try again
@@ -34,5 +34,8 @@ export function PostureCheck({ returnTo }: { returnTo: string }) {
       </div>
     );
   }
-  return <p className="mt-6 text-sm text-slate-500" aria-live="polite">Checking this device…</p>;
+  return <div className="mt-6 flex items-center gap-3 rounded-2xl bg-panel px-4 py-3 text-sm" aria-live="polite">
+      <span className="size-4 animate-spin rounded-full border-2 border-brand border-t-transparent" aria-hidden />
+      Checking this device…
+    </div>;
 }

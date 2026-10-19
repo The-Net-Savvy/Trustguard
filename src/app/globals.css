@@ -1,26 +1,40 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * Light theme only. `dark:` utilities apply under a `.dark` class, which the app
+ * never sets, so the UI no longer follows the operating system's dark mode.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-jakarta);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Brand: the vivid blue-violet of the reference design. */
+  --color-brand: #4a3aff;
+  --color-brand-hover: #3a2bef;
+  --color-brand-soft: #eeecff;
+
+  /* Surfaces */
+  --color-canvas: #e8ecf5;
+  --color-panel: #f4f6fb;
+  --color-card: #ffffff;
+  --color-line: #e7eaf2;
+  --color-ink: #12141c;
+  --color-muted: #8a90a2;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Soft blue backdrop for sign-in and other standalone pages. */
+.backdrop-brand {
+  background:
+    radial-gradient(60% 50% at 85% 10%, rgba(60, 90, 255, 0.55), transparent 70%),
+    radial-gradient(55% 45% at 10% 95%, rgba(40, 70, 255, 0.45), transparent 70%),
+    radial-gradient(40% 35% at 0% 40%, rgba(120, 160, 255, 0.35), transparent 70%),
+    #eef1fb;
 }

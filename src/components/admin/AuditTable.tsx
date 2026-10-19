@@ -1,13 +1,8 @@
+import { Pill, type Tone } from "@/components/ui/cards";
 import type { AuditRow } from "@/server/admin/queries";
 import { formatTime, TABLE, TableFrame, TD, THead } from "./AdminShell";
 
-const OUTCOME_STYLE: Record<string, string> = {
-  success: "text-emerald-700 dark:text-emerald-400",
-  allow: "text-emerald-700 dark:text-emerald-400",
-  step_up: "text-amber-700 dark:text-amber-400",
-  failure: "text-red-700 dark:text-red-400",
-  deny: "text-red-700 dark:text-red-400",
-};
+const OUTCOME_TONE: Record<string, Tone> = { success: "good", allow: "good", step_up: "warn", failure: "bad", deny: "bad" };
 
 export function summariseEvent(e: Pick<AuditRow, "event_type" | "metadata">): string {
   const m = e.metadata;
@@ -34,22 +29,24 @@ export function summariseEvent(e: Pick<AuditRow, "event_type" | "metadata">): st
 }
 
 export function AuditTable({ events }: { events: AuditRow[] }) {
-  if (events.length === 0) return <p className="text-sm text-slate-500">No events match.</p>;
+  if (events.length === 0) return <p className="text-sm text-muted">No events match.</p>;
   return (
     <TableFrame>
       <table className={TABLE}>
         <THead cols={["Time", "User", "Event", "Outcome", "Details"]} />
-        <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+        <tbody className="divide-y divide-line">
           {events.map((e) => (
             <tr key={e.id}>
-              <td className={`${TD} whitespace-nowrap tabular-nums text-slate-500`}>{formatTime(e.occurred_at)}</td>
-              <td className={TD}>{e.username ?? "—"}</td>
+              <td className={`${TD} whitespace-nowrap tabular-nums text-muted`}>{formatTime(e.occurred_at)}</td>
+              <td className={`${TD} whitespace-nowrap font-medium`}>{e.username ?? "—"}</td>
               <td className={`${TD} font-mono text-xs`}>
                 {e.event_type}
                 {e.resource ? ` · ${e.resource}` : ""}
               </td>
-              <td className={`${TD} font-medium ${OUTCOME_STYLE[e.outcome] ?? ""}`}>{e.outcome}</td>
-              <td className={`${TD} text-slate-600 dark:text-slate-400`}>{summariseEvent(e)}</td>
+              <td className={TD}>
+                <Pill tone={OUTCOME_TONE[e.outcome] ?? "neutral"}>{e.outcome}</Pill>
+              </td>
+              <td className={`${TD} text-ink/70`}>{summariseEvent(e)}</td>
             </tr>
           ))}
         </tbody>

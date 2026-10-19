@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { ArrowRight, CircleCheck, ShieldCheck } from "lucide-react";
+import { PRIMARY_BUTTON } from "@/components/shell/AuthFrame";
 import { StatusBadge } from "@/components/status/StatusBadge";
 import { getSystemHealth } from "@/server/health/checks";
 
@@ -25,64 +27,61 @@ export default async function Home() {
   ];
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6">
-      <header className="mb-10">
-        <p className="text-sm font-medium uppercase tracking-wide text-slate-500">
-          Zero-Trust-Inspired Authentication for SMEs
-        </p>
-        <h1 className="mt-1 text-4xl font-bold tracking-tight">Trust Guard</h1>
-        <p className="mt-3 text-slate-600 dark:text-slate-400">
-          A research prototype for securing remote access in Nigerian small and medium
-          enterprises. Never trust, always verify.
-        </p>
-        <Link
-          href="/dashboard"
-          className="mt-6 inline-flex rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
-        >
-          Sign in
-        </Link>
-      </header>
+    <main className="backdrop-brand flex flex-1 justify-center px-4 py-10 sm:py-16">
+      <div className="w-full max-w-5xl">
+        <header className="mb-10 flex flex-col items-start gap-6 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <span className="inline-flex items-center gap-2 text-sm font-bold tracking-tight">
+              <ShieldCheck className="size-7 text-brand" strokeWidth={2.2} /> Trust Guard
+            </span>
+            <h1 className="mt-5 max-w-2xl text-4xl font-bold leading-[1.1] tracking-tight sm:text-5xl">
+              Never trust, always verify.
+            </h1>
+            <p className="mt-4 max-w-xl text-ink/70">
+              A Zero-Trust-inspired authentication framework for securing remote access in Nigerian small and
+              medium enterprises.
+            </p>
+          </div>
+          <Link href="/dashboard" className={`${PRIMARY_BUTTON} shrink-0 px-7`}>
+            Sign in <ArrowRight className="size-4" />
+          </Link>
+        </header>
 
-      <section className="mb-10">
-        <h2 className="mb-3 text-lg font-semibold">System status</h2>
-        <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
-          {components.map((c) => (
-            <li key={c.name} className="flex flex-col gap-1 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="font-medium">{c.name}</p>
-                <p className="text-sm text-slate-500">
+        <section className="mb-4 rounded-[28px] bg-card p-6 sm:p-7">
+          <h2 className="mb-1 text-lg font-bold tracking-tight">System status</h2>
+          <p className="mb-5 text-xs text-muted">
+            Checked {new Date(health.checkedAt).toLocaleString("en-GB")} · JSON at <code>/api/health</code>
+          </p>
+          <ul className="grid gap-3 md:grid-cols-3">
+            {components.map((c) => (
+              <li key={c.name} className="rounded-2xl bg-panel p-4">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold">{c.name}</p>
+                  <StatusBadge status={c.status} />
+                </div>
+                <p className="text-xs text-muted">
                   {c.detail}
                   {c.latencyMs !== undefined && ` · ${c.latencyMs} ms`}
                 </p>
-              </div>
-              <StatusBadge status={c.status} />
-            </li>
-          ))}
-        </ul>
-        <p className="mt-2 text-xs text-slate-500">
-          Checked {new Date(health.checkedAt).toLocaleString()} · JSON at{" "}
-          <code>/api/health</code>
-        </p>
-      </section>
+              </li>
+            ))}
+          </ul>
+        </section>
 
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Framework capabilities</h2>
-        <ul className="grid gap-2 sm:grid-cols-2">
-          {PILLARS.map(([p, state]) => (
-            <li
-              key={p}
-              className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-sm dark:border-slate-800"
-            >
-              {p}
-              <span
-                className={`text-xs ${state === "Implemented" ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}
-              >
-                {state}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
+        <section className="rounded-[28px] bg-card p-6 sm:p-7">
+          <h2 className="mb-5 text-lg font-bold tracking-tight">Framework capabilities</h2>
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {PILLARS.map(([p, state]) => (
+              <li key={p} className="flex items-center justify-between gap-3 rounded-2xl bg-panel px-4 py-3 text-sm font-medium">
+                {p}
+                <span className={state === "Implemented" ? "text-emerald-600" : "text-muted"}>
+                  <CircleCheck className="size-[18px]" aria-label={state} />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
     </main>
   );
 }

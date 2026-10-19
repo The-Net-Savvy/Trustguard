@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ActionButton } from "@/components/admin/ActionButton";
+import { Pill } from "@/components/ui/cards";
 import { AdminShell, flashFrom, formatTime, TABLE, TableFrame, TD, THead } from "@/components/admin/AdminShell";
 import { adminPageContext } from "@/server/admin/page-context";
 import { listUsers } from "@/server/admin/queries";
@@ -14,23 +15,23 @@ export default async function AdminUsersPage({ searchParams }: PageProps<"/admin
 
   return (
     <AdminShell active="/admin/users" ctx={ctx} manage={manage} flash={flashFrom(await searchParams)}>
-      <h2 className="mb-1 text-lg font-semibold">Users ({users.length})</h2>
-      <p className="mb-3 text-sm text-slate-500">
+      <h2 className="mb-1 text-sm font-semibold">{users.length} users</h2>
+      <p className="mb-3 text-sm text-muted">
         Accounts and roles are managed in Keycloak; users appear here after their first sign-in.{" "}
         <strong>Suspend</strong> disables the account in Keycloak and ends all sessions.
       </p>
       <TableFrame>
         <table className={TABLE}>
           <THead cols={["User", "Roles", "Last sign-in", "Sessions", "Devices", "Status", ""]} />
-          <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+          <tbody className="divide-y divide-line">
             {users.map((u) => {
               const self = u.id === ctx.user.id;
               return (
                 <tr key={u.id}>
                   <td className={TD}>
                     <span className="font-medium">{u.username}</span>
-                    {self && <span className="ml-1 text-xs text-slate-500">(you)</span>}
-                    <div className="text-xs text-slate-500">{u.display_name ?? u.email ?? ""}</div>
+                    {self && <span className="ml-1 text-xs text-muted">(you)</span>}
+                    <div className="text-xs text-muted">{u.display_name ?? u.email ?? ""}</div>
                   </td>
                   <td className={TD}>{u.roles.map((r) => ROLE_LABELS[r] ?? r).join(", ") || "—"}</td>
                   <td className={`${TD} tabular-nums`}>{formatTime(u.last_login_at)}</td>
@@ -38,14 +39,14 @@ export default async function AdminUsersPage({ searchParams }: PageProps<"/admin
                   <td className={`${TD} tabular-nums`}>{u.devices}</td>
                   <td className={TD}>
                     {u.suspended_at ? (
-                      <span className="text-red-700 dark:text-red-400">
-                        Suspended
-                        <div className="text-xs text-slate-500">
+                      <>
+                        <Pill tone="bad">Suspended</Pill>
+                        <div className="mt-1 text-xs text-muted">
                           by {u.suspended_by ?? "—"}, {formatTime(u.suspended_at)}
                         </div>
-                      </span>
+                      </>
                     ) : (
-                      "Active"
+                      <Pill tone="good">Active</Pill>
                     )}
                   </td>
                   <td className={TD}>
@@ -73,7 +74,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps<"/admin
                       )}
                       <Link
                         href={`/admin/audit?user=${encodeURIComponent(u.username)}`}
-                        className="whitespace-nowrap rounded-md px-2.5 py-1 text-xs text-slate-500 underline-offset-4 hover:underline"
+                        className="whitespace-nowrap rounded-md px-2.5 py-1 text-xs text-muted underline-offset-4 hover:underline"
                       >
                         Activity
                       </Link>

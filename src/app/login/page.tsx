@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Fingerprint, KeyRound, MonitorSmartphone } from "lucide-react";
+import { AuthFrame, Notice, PRIMARY_BUTTON } from "@/components/shell/AuthFrame";
 import { redirect } from "next/navigation";
 import { isKeycloakConfigured } from "@/server/auth/keycloak";
 import { safeReturnTo } from "@/server/auth/login";
@@ -38,51 +40,47 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const reauth = error === "mfa_required" || stepUp ? "&reauth=1" : "";
 
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-12">
-      <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Trust Guard</p>
-      <h1 className="mt-1 text-3xl font-bold tracking-tight">Sign in</h1>
-      <p className="mt-2 text-slate-600 dark:text-slate-400">
-        Access is verified on every request. You will sign in with your company account and a
-        one-time code from your authenticator app.
+    <AuthFrame>
+      <h1 className="text-[28px] font-bold leading-tight tracking-tight">
+        {stepUp ? "Confirm it is you" : "Welcome back"}
+      </h1>
+      <p className="mt-2 text-sm text-muted">
+        Access is verified on every request. You will sign in with your company account and a one-time code
+        from your authenticator app.
       </p>
 
       {stepUp && !error && (
-        <p className="mt-6 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          Additional verification is required for this page. Please confirm it is you with your password and
-          a new one-time code.
-        </p>
+        <Notice tone="warn">
+          Additional verification is required for this page. Please confirm it is you with your password and a new
+          one-time code.
+        </Notice>
       )}
-      {signedOut && !error && (
-        <p className="mt-6 rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
-          You have been signed out.
-        </p>
-      )}
-      {error && (
-        <p
-          role="alert"
-          className="mt-6 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
-        >
-          {ERROR_MESSAGES[error] ?? ERROR_MESSAGES.internal_error}
-        </p>
-      )}
+      {signedOut && !error && <Notice tone="good">You have been signed out.</Notice>}
+      {error && <Notice tone="bad">{ERROR_MESSAGES[error] ?? ERROR_MESSAGES.internal_error}</Notice>}
 
       {configured ? (
-        <a
-          href={`/api/auth/login?returnTo=${encodeURIComponent(returnTo)}${reauth}`}
-          className="mt-8 inline-flex justify-center rounded-md bg-slate-900 px-4 py-2.5 font-medium text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
-        >
+        <a href={`/api/auth/login?returnTo=${encodeURIComponent(returnTo)}${reauth}`} className={`mt-8 w-full ${PRIMARY_BUTTON}`}>
+          <KeyRound className="size-4" />
           {reauth ? "Sign in again with a one-time code" : "Continue to secure sign-in"}
         </a>
       ) : (
-        <p className="mt-8 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          The identity provider is not configured. Set the <code>KEYCLOAK_*</code> values in{" "}
-          <code>.env</code>.
-        </p>
+        <Notice tone="warn">
+          The identity provider is not configured. Set the <code>KEYCLOAK_*</code> values in <code>.env</code>.
+        </Notice>
       )}
 
-      <Link href="/" className="mt-6 text-sm text-slate-500 underline-offset-4 hover:underline">
+      <ul className="mt-8 space-y-2.5 border-t border-line pt-6 text-sm text-muted">
+        <li className="flex items-center gap-2.5">
+          <Fingerprint className="size-4 text-brand" /> Password and one-time code, every time
+        </li>
+        <li className="flex items-center gap-2.5">
+          <MonitorSmartphone className="size-4 text-brand" /> Your device is checked before you get in
+        </li>
+      </ul>
+
+      <Link href="/" className="mt-6 inline-block text-sm text-muted underline-offset-4 hover:underline">
         System status
       </Link>
-    </main>
+    </AuthFrame>
   );
 }

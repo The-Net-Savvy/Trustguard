@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { ShieldX } from "lucide-react";
+import { AppShell, PageHeader } from "@/components/shell/AppShell";
+import { SECONDARY_BUTTON } from "@/components/shell/AuthFrame";
 import { redirect } from "next/navigation";
 import { RiskPanel } from "@/components/access/RiskPanel";
-import { LogoutButton } from "@/components/auth/LogoutButton";
 import { evaluateAccess } from "@/server/access/require-access";
 import { safeReturnTo } from "@/server/auth/login";
 
@@ -25,36 +27,42 @@ export default async function AccessDeniedPage({ searchParams }: PageProps<"/acc
   // Re-evaluate (without auditing again) to explain the decision to the user.
   const result = await evaluateAccess(resource, returnTo, { audit: false });
   if (result.kind === "redirect") redirect(result.to);
-  const { decision, risk, posture } = result.ctx;
+  const { decision, risk, posture, user } = result.ctx;
   if (decision.decision !== "deny") redirect(returnTo);
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6">
-      <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Trust Guard</p>
-      <h1 className="mt-1 text-3xl font-bold tracking-tight">Access denied</h1>
-      <p role="alert" className="mt-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
-        {decision.explanation} {ADVICE[decision.reason] ?? ""}
-      </p>
-      <p className="mt-2 text-xs text-slate-500">
-        Resource <code>{resource}</code> · policy <code>{decision.policyId ?? "none"}</code> · reason{" "}
-        <code>{decision.reason}</code>. This decision was recorded in the audit log.
-      </p>
+    <AppShell user={user} active="">
+      <PageHeader
+        title="Access denied"
+        subtitle="Trust Guard checked this request and the policy does not allow it right now."
+      />
+      <div role="alert" className="mb-4 flex items-start gap-3 rounded-3xl bg-rose-50 p-5 text-rose-900 ring-1 ring-rose-200">
+        <ShieldX className="mt-0.5 size-5 shrink-0" />
+        <div>
+          <p className="font-semibold">
+            {decision.explanation} {ADVICE[decision.reason] ?? ""}
+          </p>
+          <p className="mt-1 text-xs text-rose-800/80">
+            Resource <code>{resource}</code> · policy <code>{decision.policyId ?? "none"}</code> · reason{" "}
+            <code>{decision.reason}</code>. This decision was recorded in the audit log.
+          </p>
+        </div>
+      </div>
 
-      <section className="mt-8">
-        <RiskPanel risk={risk} posture={posture} />
-      </section>
+      <RiskPanel risk={risk} posture={posture} />
 
-      <div className="mt-8 flex gap-2">
+      <div className="mt-6 flex flex-wrap gap-2">
         {returnTo !== "/dashboard" && (
-          <Link
-            href="/dashboard"
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
-          >
-            Back to dashboard
+          <Link href="/dashboard" className={SECONDARY_BUTTON}>
+            Back to my security
           </Link>
         )}
-        <LogoutButton />
+        <form action="/api/auth/logout" method="post">
+          <button type="submit" className={SECONDARY_BUTTON}>
+            Sign out
+          </button>
+        </form>
       </div>
-    </main>
+    </AppShell>
   );
 }
