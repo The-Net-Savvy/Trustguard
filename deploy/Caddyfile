@@ -1,0 +1,17 @@
+# Trust Guard reverse proxy (used by docker-compose.prod.yml).
+# Caddy obtains and renews Let's Encrypt certificates for both hostnames
+# automatically; ports 80 and 443 must be reachable from the internet.
+#
+# Incoming X-Forwarded-For headers from clients are discarded and replaced with
+# the real client IP, which the app uses for its trusted-network checks.
+{$APP_HOST} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy app:3000
+}
+
+{$AUTH_HOST} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy keycloak:8080
+}

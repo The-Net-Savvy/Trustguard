@@ -59,7 +59,7 @@ export class Browser {
 
   set(name: string, value: string) {
     this.cookies = this.cookies.filter((c) => c.name !== name);
-    this.cookies.push({ name, value, host: "localhost", path: "/" });
+    this.cookies.push({ name, value, host: new URL(APP).hostname, path: "/" });
   }
 
   async request(url: string | URL, init: RequestInit = {}) {
