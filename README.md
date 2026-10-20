@@ -209,6 +209,12 @@ npm run dev                       # http://localhost:3000
 Set `DATABASE_URL` to the Supabase connection string (Dashboard → Connect → Session pooler),
 set `DATABASE_SSL=true`, run `npm run db:migrate`, and start infra with `npm run infra:up` (no `local-db` profile).
 
+## Hosting
+
+To put Trust Guard on the internet, run [`docker-compose.prod.yml`](docker-compose.prod.yml) on a
+single VPS: Caddy provides HTTPS with automatic certificates, Keycloak runs in production mode, and
+no domain is required. See [docs/deploy-vps.md](docs/deploy-vps.md).
+
 ## Scripts
 
 | Script | Purpose |
