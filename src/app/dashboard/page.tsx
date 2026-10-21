@@ -40,7 +40,7 @@ export default async function DashboardPage() {
     <AppShell user={user} active="/dashboard">
       <PostureHeartbeat />
       <PageHeader
-        title={<>Hello, {firstName}! <span aria-hidden>👋</span></>}
+        title={`Hello, ${firstName}!`}
         subtitle="Here is the security status of this session. It is checked again on every request."
         aside={
           <Pill tone={decision.decision === "allow" ? "good" : "warn"}>
